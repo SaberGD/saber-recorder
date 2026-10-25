@@ -65,16 +65,35 @@ const handlers = {
     if (!account) throw new Error('اربط حساب Google الأول');
     const params = new URLSearchParams({ ext: chrome.runtime.id, folder: CONFIG.SHARED_FOLDER_ID, hint: account.email });
     const win = await chrome.windows.create({ url: `${CONFIG.PICKER_PAGE_URL}?${params}`, type: 'popup', width: 760, height: 640 });
-    await chrome.storage.session.set({ pickerWindowId: win.id });
+    await chrome.storage.session.set({ pickerWindowId: win.id, pickerReady: false });
+    setTimeout(() => checkPickerPageLoaded(win.id), PICKER_READY_TIMEOUT_MS);
     return {};
   },
 };
 
 const PICKER_ORIGIN = new URL(CONFIG.PICKER_PAGE_URL).origin;
+const PICKER_READY_TIMEOUT_MS = 12_000;
+
+// لو صفحة الـ Picker مبعتتش إنها اتفتحت، يبقى السيستم لسه معلهوش deploy للصفحة (بيفتح الصفحة الرئيسية بدالها)
+async function checkPickerPageLoaded(windowId) {
+  const { pickerWindowId, pickerReady } = await chrome.storage.session.get(['pickerWindowId', 'pickerReady']);
+  if (pickerReady || pickerWindowId !== windowId) return;
+  await chrome.windows.remove(windowId).catch(() => {});
+  chrome.notifications.create('picker-unavailable', {
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: 'صفحة اختيار الفولدر مش متاحة',
+    message: 'صفحة اختيار فولدر الأكاديمية لسه مش موجودة على السيستم أو مفتحتش. التسجيلات هتفضل تترفع على Drive الشخصي. كلّم الأدمن.',
+  });
+}
 
 // الرسالة الوحيدة اللي بنقبلها من برّه: ID الفولدر اللي اتاختار، ومن صفحة السيستم بس.
 // التوكن بتاع الصفحة مبيتبعتش هنا، والإكستنشن بتتأكد من الفولدر بالتوكن بتاعها.
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (sender.origin === PICKER_ORIGIN && message?.type === 'picker-page-ready') {
+    chrome.storage.session.set({ pickerReady: true }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
   if (sender.origin !== PICKER_ORIGIN || message?.type !== 'shared-folder-picked' || typeof message.folderId !== 'string') {
     sendResponse({ ok: false, error: 'رسالة غير مسموح بيها' });
     return false;
