@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Saber Group Recorder",
+  "short_name": "Saber Recorder",
+  "version": "1.0.0",
+  "description": "تسجيل المحاضرات أونلاين (الشاشة وصوت الجهاز والمايك) مع حفظ محلي ورفع تلقائي على Google Drive.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt7pyzxg4AVNYz+XOL1r+auFachiAFxLuWaZoQnK2QF2GTdwcIvDUBw2B2SxE+h07MMPeV8UwSdObtfhzpTMgGCJlXHdIlFivdCpkEYU17r/QwygggNIYpd+Z+j1StaQLPfQm/jL01ipLv07jbd8bTI2QGr6Bfp65DEwvcoaetzK2oxIX9OSAGml0fKBi4viOh4Vi8dSG6634cYmodfyS6nVi2nSSnxvz/F8x7Aqb5uq6bXhTLGu9CLtpa18LA+EYmxe70EhcBDlLEdi+F3Br21xa2v2GgO52jEHPAnu4FZAoXU1B2meHeWW+4DT4H+BVZjmCNLRmrC8gsFxnsYh/UQIDAQAB",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Saber Recorder",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "activeTab",
+    "tabCapture",
+    "storage",
+    "unlimitedStorage",
+    "downloads",
+    "notifications",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
+  ]
+}

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>Saber Recorder</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <img src="icons/icon48.png" alt="">
+    <div class="grow">
+      <div class="title">Saber Recorder</div>
+      <div class="subtitle" id="header-title"></div>
+    </div>
+    <button id="btn-minimize" class="btn btn-link hidden" style="color:#fff" title="تصغير اللوحة"><span data-icon="minimize"></span></button>
+  </header>
+
+  <main class="content">
+    <!-- قبل البدء -->
+    <section id="ready-view" class="hidden" style="display:grid;gap:12px">
+      <div class="card">
+        <div class="card-title">هيتسجّل إيه — تقدر تقفل أي حاجة قبل ما تبدأ</div>
+        <div id="ready-sources"></div>
+      </div>
+
+      <div id="mic-select-card" class="card hidden">
+        <div class="card-title">المايك</div>
+        <select id="mic-select" aria-label="اختيار المايك"></select>
+        <div class="meter" aria-hidden="true"><div id="ready-mic-meter"></div></div>
+        <p class="muted" style="margin-top:6px">اتكلم وشوف الشريط بيتحرك علشان تتأكد إن المايك شغال.</p>
+      </div>
+
+      <div id="screen-tip" class="notice notice-info">
+        <span>في الشاشة اللي هتظهر: اختار <b>الشاشة بالكامل</b> (Entire screen)، وعلّم على <b>مشاركة صوت النظام</b> (Share system audio) علشان كل حاجة تتسجّل حتى لو صغّرت الميتينج.</span>
+      </div>
+
+      <div class="card">
+        <div class="card-title">الحفظ</div>
+        <div id="ready-save" class="small"></div>
+      </div>
+
+      <div id="ready-error" class="notice notice-danger hidden"></div>
+      <button id="btn-begin" class="btn btn-primary btn-block btn-lg"><span data-icon="rec"></span> اختار الشاشة وابدأ التسجيل</button>
+    </section>
+
+    <!-- أثناء التسجيل -->
+    <section id="rec-view" class="hidden" style="display:grid;gap:12px">
+      <div class="card" style="text-align:center">
+        <span id="rec-pill" class="pill pill-rec"><span class="dot pulse"></span> <span id="rec-label">جاري التسجيل</span></span>
+        <div id="rec-timer" class="timer" style="margin-top:6px">00:00</div>
+        <div class="muted"><span id="rec-size" class="ltr">0 MB</span> • <span id="rec-rate"></span></div>
+      </div>
+
+      <div id="rec-warnings" style="display:grid;gap:8px"></div>
+
+      <div class="card">
+        <div class="card-title">بيتسجّل دلوقتي — اقفل أي حاجة من هنا في أي وقت</div>
+        <div id="rec-sources"></div>
+      </div>
+
+      <div class="card" id="rec-save"></div>
+
+      <div class="row">
+        <button id="btn-pause" class="btn grow"><span data-icon="pause"></span> <span>إيقاف مؤقت</span></button>
+        <button id="btn-stop" class="btn btn-danger grow"><span data-icon="stop"></span> إنهاء التسجيل</button>
+      </div>
+    </section>
+
+    <!-- الحفظ والرفع بعد الإنهاء -->
+    <section id="finish-view" class="hidden" style="display:grid;gap:12px">
+      <div class="card" style="text-align:center">
+        <div id="finish-icon" class="source-icon" style="margin:0 auto 8px; width:48px; height:48px; border-radius:50%"></div>
+        <h2 id="finish-heading" style="font-size:17px"></h2>
+        <p id="finish-sub" class="muted" style="margin-top:4px"></p>
+      </div>
+      <div class="card" id="finish-save"></div>
+      <div id="finish-error" class="notice notice-danger hidden"></div>
+      <div class="row" id="finish-actions"></div>
+    </section>
+  </main>
+
+  <script type="module" src="recorder.js"></script>
+</body>
+</html>

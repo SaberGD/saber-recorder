@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>Saber Recorder</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { width: 380px; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <img src="icons/icon48.png" alt="">
+    <div>
+      <div class="title">Saber Recorder</div>
+      <div class="subtitle">تسجيل المحاضرات أونلاين</div>
+    </div>
+  </header>
+
+  <main class="content">
+    <!-- تسجيل شغال -->
+    <section id="active-view" class="card hidden">
+      <div class="row">
+        <span id="active-pill" class="pill pill-rec"><span class="dot pulse"></span> <span id="active-label">جاري التسجيل</span></span>
+        <span class="grow"></span>
+        <span id="active-timer" class="bold ltr">00:00</span>
+      </div>
+      <p id="active-title" class="muted" style="margin-top:6px"></p>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-focus" class="btn grow">فتح لوحة التسجيل</button>
+        <button id="btn-stop" class="btn btn-danger grow"><span data-icon="stop"></span> إنهاء التسجيل</button>
+      </div>
+    </section>
+
+    <!-- إعداد تسجيل جديد -->
+    <section id="setup-view" class="content" style="padding:0">
+      <div id="tab-notice" class="notice notice-info"></div>
+
+      <div class="card">
+        <div class="card-title">اسم المحاضرة</div>
+        <input id="title" type="text" placeholder="مثال: AutoCAD — جروب 12 — المحاضرة 5" maxlength="120">
+      </div>
+
+      <div class="card">
+        <div class="card-title">هيتسجّل إيه</div>
+        <div class="row source-row" data-source="screen">
+          <span class="source-icon" data-icon="screen"></span>
+          <div class="grow">
+            <div class="bold">الشاشة</div>
+            <div class="muted">الشاشة اللي هتختارها بالكامل، حتى لو الميتينج متصغّر</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="src-screen" aria-label="تسجيل الشاشة"><span></span></label>
+        </div>
+        <div class="row source-row" data-source="systemAudio">
+          <span class="source-icon" data-icon="speaker"></span>
+          <div class="grow">
+            <div class="bold">صوت الجهاز والميتينج</div>
+            <div class="muted">أصوات الطلبة في الميتينج وأي صوت طالع من الجهاز</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="src-systemAudio" aria-label="تسجيل صوت الجهاز"><span></span></label>
+        </div>
+        <div class="row source-row" data-source="mic">
+          <span class="source-icon" data-icon="mic"></span>
+          <div class="grow">
+            <div class="bold">المايك</div>
+            <div class="muted">صوتك وانت بتشرح</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="src-mic" aria-label="تسجيل المايك"><span></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">الجودة والمساحة</div>
+        <div id="quality" class="quality"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">الحفظ</div>
+        <label class="check">
+          <input type="checkbox" id="save-local">
+          <span><span class="bold">حفظ نسخة على الجهاز</span><br><span class="muted" id="local-hint"></span></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="save-drive">
+          <span class="grow"><span class="bold">رفع تلقائي على Google Drive</span><br><span class="muted">بيترفع وانت بتسجّل، ولو النت فصل بيكمّل لوحده</span></span>
+        </label>
+        <div id="drive-account" class="row" style="margin-top:8px; margin-inline-start:26px"></div>
+      </div>
+
+      <div id="start-error" class="notice notice-danger hidden"></div>
+      <button id="btn-start" class="btn btn-primary btn-block btn-lg"><span data-icon="rec"></span> ابدأ التسجيل</button>
+    </section>
+
+    <section id="attention" class="card hidden">
+      <div class="card-title">تسجيلات محتاجة متابعة</div>
+      <div id="attention-list"></div>
+    </section>
+
+    <section id="recent" class="card hidden">
+      <div class="card-title">آخر التسجيلات</div>
+      <div id="recent-list"></div>
+    </section>
+  </main>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
