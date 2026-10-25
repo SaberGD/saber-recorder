@@ -101,11 +101,29 @@ async function renderDriveAccount() {
   }
   driveAccount = await getDriveAccount();
   if (driveAccount) {
-    el.innerHTML = `<span class="pill pill-ok">✓</span><span class="small grow ltr" style="text-align:right">${escapeHtml(driveAccount.email)}</span>
-      <button class="btn btn-link" id="btn-drive-change">تغيير</button>`;
+    const shared = driveAccount.sharedRootId;
+    const notices = [];
+    if (driveAccount.sharedFolderWarning) {
+      notices.push(`<div class="notice notice-warn" style="margin-top:6px">${escapeHtml(driveAccount.sharedFolderWarning)}</div>`);
+    } else if (CONFIG.SHARED_FOLDER_ID && !shared) {
+      notices.push('<div class="notice notice-info" style="margin-top:6px">الأكاديمية عاملة فولدر مشترك للتسجيلات. اختاره علشان تسجيلاتك تتجمع فيه.</div>');
+    }
+    el.innerHTML = `
+      <div class="row"><span class="pill pill-ok">✓</span><span class="small grow ltr" style="text-align:right">${escapeHtml(driveAccount.email)}</span>
+        <button class="btn btn-link" id="btn-drive-change">تغيير الحساب</button></div>
+      <div class="row" style="margin-top:4px">
+        <span class="muted small">مكان الرفع:</span>
+        <span class="small bold grow">${shared ? escapeHtml(driveAccount.sharedRootName || 'فولدر الأكاديمية') : 'Drive الشخصي'}</span>
+        <button class="btn btn-link" id="btn-pick-folder">${shared ? 'تغيير الفولدر' : 'اختار فولدر الأكاديمية'}</button>
+      </div>
+      ${notices.join('')}`;
     $('btn-drive-change').addEventListener('click', async () => {
       await chrome.runtime.sendMessage({ type: 'drive-disconnect' });
       connectDrive();
+    });
+    $('btn-pick-folder').addEventListener('click', async () => {
+      const res = await chrome.runtime.sendMessage({ type: 'pick-shared-folder' });
+      if (res?.ok) window.close();
     });
   } else {
     el.innerHTML = '<button class="btn btn-link" id="btn-drive-connect" style="padding-inline:0">ربط حساب Google ←</button>';

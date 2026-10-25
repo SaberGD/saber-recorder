@@ -46,6 +46,7 @@ init();
 async function init() {
   renderIcons();
   wireMessages();
+  watchSharedFolderWarning();
   window.addEventListener('beforeunload', (e) => {
     if (['recording', 'paused', 'finishing'].includes(session.state)) e.preventDefault();
   });
@@ -654,6 +655,7 @@ function renderSave() {
         <div class="row" style="margin:0"><span class="bold grow">Google Drive</span><span class="muted ltr">${formatBytes(up.uploaded)} / ${formatBytes(total)}</span></div>
         <div class="progress" style="margin-top:6px"><div style="width:${pct}%"></div></div>
         <div class="muted" style="margin-top:4px">${texts[up.state] || ''}</div>
+        ${session.sharedFolderWarning ? `<div class="notice notice-warn" style="margin-top:6px">${escapeHtml(session.sharedFolderWarning)}</div>` : ''}
       </div></div>
       ${up.state === 'needs-auth' ? '<button class="btn btn-primary btn-block" data-action="reauth" style="margin-top:8px">إعادة ربط حساب Google</button>' : ''}`);
   }
@@ -720,6 +722,16 @@ function wireMessages() {
       sendResponse({ ok: true });
     }
     return false;
+  });
+}
+
+// لو فولدر الأكاديمية مبقاش متاح أثناء التسجيل ده، drive.js بيرجع لـ Drive الشخصي ويسيب تحذير نعرضه هنا
+function watchSharedFolderWarning() {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    const warning = area === 'local' && changes.driveAuth?.newValue?.sharedFolderWarning;
+    if (!warning || warning === changes.driveAuth.oldValue?.sharedFolderWarning) return;
+    session.sharedFolderWarning = warning;
+    renderSave();
   });
 }
 

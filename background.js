@@ -1,4 +1,5 @@
-import { getToken, disconnectDrive } from './lib/drive.js';
+import { CONFIG } from './config.js';
+import { getToken, disconnectDrive, getDriveAccount, setSharedRoot } from './lib/drive.js';
 import { listRecordings, patchRecording, getActiveRecorder } from './lib/recordings.js';
 
 const RECORDER_SIZE = { width: 440, height: 720 };
@@ -57,7 +58,37 @@ const handlers = {
     await disconnectDrive();
     return {};
   },
+
+  // صفحة الـ Picker على دومين السيستم، لأن MV3 مانع تحميل سكربت جوجل جوه صفحات الإكستنشن
+  async 'pick-shared-folder'() {
+    const account = await getDriveAccount();
+    if (!account) throw new Error('اربط حساب Google الأول');
+    const params = new URLSearchParams({ ext: chrome.runtime.id, folder: CONFIG.SHARED_FOLDER_ID, hint: account.email });
+    const win = await chrome.windows.create({ url: `${CONFIG.PICKER_PAGE_URL}?${params}`, type: 'popup', width: 760, height: 640 });
+    await chrome.storage.session.set({ pickerWindowId: win.id });
+    return {};
+  },
 };
+
+const PICKER_ORIGIN = new URL(CONFIG.PICKER_PAGE_URL).origin;
+
+// الرسالة الوحيدة اللي بنقبلها من برّه: ID الفولدر اللي اتاختار، ومن صفحة السيستم بس.
+// التوكن بتاع الصفحة مبيتبعتش هنا، والإكستنشن بتتأكد من الفولدر بالتوكن بتاعها.
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (sender.origin !== PICKER_ORIGIN || message?.type !== 'shared-folder-picked' || typeof message.folderId !== 'string') {
+    sendResponse({ ok: false, error: 'رسالة غير مسموح بيها' });
+    return false;
+  }
+  setSharedRoot(message.folderId)
+    .then(async (folder) => {
+      sendResponse({ ok: true, folderName: folder.name });
+      const { pickerWindowId } = await chrome.storage.session.get('pickerWindowId');
+      // نسيب المدرب يشوف رسالة النجاح ثانية ونص وبعدين نقفل النافذة
+      if (pickerWindowId) setTimeout(() => chrome.windows.remove(pickerWindowId).catch(() => {}), 1500);
+    })
+    .catch((err) => sendResponse({ ok: false, error: err.message }));
+  return true;
+});
 
 // لو لوحة التسجيل اتقفلت والتسجيل شغال، نعلّمه "اتقطع" علشان يظهر في الـ popup ويتكمل
 chrome.windows.onRemoved.addListener(async (windowId) => {

@@ -4,8 +4,15 @@ export const CONFIG = {
   // ومضاف عليه Redirect URI: https://koaoinnnobkcaabcgnhiajnolamnceoi.chromiumapp.org/
   OAUTH_CLIENT_ID: '',
 
-  // الفولدر اللي هيتعمل على Google Drive وتترفع فيه التسجيلات
+  // الفولدر اللي هيتعمل على Google Drive الشخصي للمدرب لو مااختارش فولدر الأكاديمية
   DRIVE_FOLDER_NAME: 'Saber Group - تسجيلات المحاضرات',
+
+  // فولدر الأكاديمية المشترك (من رابطه: drive.google.com/drive/folders/<ID>).
+  // ده بيفتح الـ Picker على الفولدر على طول بس، ومبيديش أي صلاحية لوحده: المدرب لازم يختاره بنفسه.
+  SHARED_FOLDER_ID: '',
+
+  // صفحة اختيار الفولدر على السيستم (التطبيق بيستخدم HashRouter، علشان كده فيه #)
+  PICKER_PAGE_URL: 'https://training.sabergroupacademy.com/#/drive-picker',
 
   // الفولدر جوه Downloads اللي بيتحفظ فيه التسجيل محليًا
   LOCAL_FOLDER_NAME: 'Saber Recordings',
