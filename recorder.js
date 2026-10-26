@@ -359,6 +359,74 @@ async function startRecorder() {
 
   const recorded = Object.entries(session.available).filter(([k, v]) => v && session.enabled[k]).map(([k]) => SOURCE_INFO[k].label);
   notify('بدأ التسجيل', `بيتسجّل دلوقتي: ${recorded.join('، ')}`);
+  watchMeetingEnd();
+}
+
+/* ---------- إنهاء أوتوماتيك لما الميتينج يخلص ---------- */
+
+const MEET_CHECK_MS = 5000;
+const AUTO_STOP_SECONDS = 20;
+
+// بيشتغل جوه تاب الميتينج: لسه في المكالمة؟ (زرار إنهاء المكالمة موجود)
+// null = مش صفحة Google Meet، فمنقدرش نحكم
+function meetInCallProbe() {
+  if (location.hostname !== 'meet.google.com') return null;
+  const byLabel = document.querySelector('[aria-label*="Leave call" i], [aria-label*="مغادرة المكالمة"], [aria-label*="إنهاء المكالمة"], [jsname="CQylAd"]');
+  if (byLabel) return true;
+  // أيقونة زرار إنهاء المكالمة اسمها call_end في كل اللغات
+  return [...document.querySelectorAll('i, span')].some((el) => el.childElementCount === 0 && el.textContent.trim() === 'call_end');
+}
+
+function watchMeetingEnd() {
+  if (!session.options.autoStop || !session.sourceTabId) return;
+  let seenInCall = false;
+  let misses = 0;
+  session.meetTimer = setInterval(async () => {
+    if (!['recording', 'paused'].includes(session.state) || session.autoStopDismissed) return;
+    let inCall;
+    try {
+      const [res] = await chrome.scripting.executeScript({ target: { tabId: session.sourceTabId }, func: meetInCallProbe });
+      inCall = res?.result;
+    } catch {
+      // التاب اتقفل أو خرج من صفحة الميتينج
+      inCall = seenInCall ? false : null;
+    }
+    if (inCall === null || inCall === undefined) return;
+    if (inCall) {
+      seenInCall = true;
+      misses = 0;
+      return;
+    }
+    if (!seenInCall) return;
+    misses += 1;
+    // مرتين ورا بعض (حوالي 10 ثواني) علشان منقفلش بسبب لحظة تحميل
+    if (misses >= 2 && !session.autoStopTimer) startAutoStopCountdown();
+  }, MEET_CHECK_MS);
+}
+
+function startAutoStopCountdown() {
+  let left = AUTO_STOP_SECONDS;
+  const banner = $('autostop-banner');
+  const render = () => { $('autostop-text').textContent = `الميتينج خلص. التسجيل هيتنهي ويتحفظ خلال ${left} ثانية.`; };
+  render();
+  banner.classList.remove('hidden');
+  notify('الميتينج خلص', `التسجيل هيتنهي خلال ${AUTO_STOP_SECONDS} ثانية. لو لسه بتشرح افتح لوحة التسجيل واضغط "كمّل التسجيل".`);
+  $('btn-keep-recording').onclick = () => {
+    clearInterval(session.autoStopTimer);
+    session.autoStopTimer = null;
+    session.autoStopDismissed = true; // المدرب قال يكمّل: مش هنسأله تاني في التسجيل ده
+    banner.classList.add('hidden');
+  };
+  session.autoStopTimer = setInterval(() => {
+    left -= 1;
+    render();
+    if (left > 0) return;
+    clearInterval(session.autoStopTimer);
+    session.autoStopTimer = null;
+    banner.classList.add('hidden');
+    notify('التسجيل اتنهى', 'الميتينج خلص، فالتسجيل اتنهى وبيتحفظ.');
+    stop();
+  }, 1000);
 }
 
 /* ---------- أثناء التسجيل ---------- */
@@ -447,6 +515,8 @@ async function stop() {
   session.stoppedAt = Date.now();
   session.state = 'finishing';
   clearInterval(session.tick);
+  clearInterval(session.meetTimer);
+  clearInterval(session.autoStopTimer);
   setBadge('finishing');
 
   await new Promise((resolve) => {
@@ -518,8 +588,27 @@ async function finishSaving() {
   if (session.local.downloadId) actions.push(button('فتح مكان الملف', () => chrome.downloads.show(session.local.downloadId)));
   const link = session.rec.drive?.webViewLink;
   if (link) actions.push(button('فتح على Drive', () => chrome.tabs.create({ url: link })));
+  if (session.rec.lecture) actions.push(button('سجّل جزء تاني لنفس المحاضرة', startNextPart, 'btn grow'));
   actions.push(closeButton());
   setFinishActions(actions);
+}
+
+// التسجيل اتقفل بالغلط والمدرب عايز يكمّل: تسجيل جديد لنفس المحاضرة، والسيستم بيرفعه كالجزء اللي بعده
+async function startNextPart() {
+  const rec = session.rec;
+  const base = session.options || {};
+  const lecture = { ...rec.lecture, part: (rec.lecture.part || 1) + 1 };
+  const options = {
+    ...DEFAULT_OPTIONS,
+    ...base,
+    title: lectureLabel(lecture),
+    sources: base.sources || rec.sources || DEFAULT_OPTIONS.sources,
+    save: rec.save,
+    quality: base.quality || rec.quality || DEFAULT_OPTIONS.quality,
+    lecture,
+  };
+  await chrome.storage.session.set({ pendingStart: { options, sourceTabId: session.sourceTabId ?? null } });
+  location.href = 'recorder.html?start=1';
 }
 
 async function saveLocally() {
@@ -726,6 +815,9 @@ function wireMessages() {
     } else if (message?.type === 'recorder-stop') {
       stop();
       sendResponse({ ok: true });
+    } else if (message?.type === 'recorder-toggle-pause') {
+      togglePause();
+      sendResponse({ ok: true, state: session.state });
     }
     return false;
   });
@@ -811,6 +903,8 @@ async function finalizeDriveUpload(file, lecture) {
         durationSec: Math.round((session.rec.durationMs || 0) / 1000),
       });
       session.rec = await patchRecording(session.rec.id, {
+        // رقم الجزء الحقيقي من السيستم (لو المحاضرة اتغيرت ممكن يتغير)
+        lecture: { ...lecture, part: res.part || 1 },
         drive: { completed: true, webViewLink: res.webViewLink || session.rec.drive?.webViewLink || '', folderPath: res.folderPath || '' },
       });
       renderSave();

@@ -4,7 +4,7 @@ import { createLecturePicker, lectureLabel } from './lib/lecture-picker.js';
 import {
   listRecordings, removeRecording, needsAttention, getActiveRecorder, formatBytes, formatDuration,
 } from './lib/recordings.js';
-import { renderIcons } from './lib/icons.js';
+import { ICONS, renderIcons } from './lib/icons.js';
 
 const $ = (id) => document.getElementById(id);
 const SOURCES = ['screen', 'systemAudio', 'mic'];
@@ -59,6 +59,7 @@ async function loadOptions() {
   for (const s of SOURCES) $(`src-${s}`).checked = opts.sources[s];
   $('save-local').checked = opts.save.local;
   $('save-drive').checked = opts.save.drive;
+  $('opt-autostop').checked = opts.autoStop !== false;
   const quality = document.querySelector(`input[name="quality"][value="${opts.quality}"]`)
     || document.querySelector('input[name="quality"][value="balanced"]');
   quality.checked = true;
@@ -139,6 +140,7 @@ function readOptions() {
     sources: Object.fromEntries(SOURCES.map((s) => [s, $(`src-${s}`).checked])),
     save: { local: $('save-local').checked, drive: $('save-drive').checked },
     quality: document.querySelector('input[name="quality"]:checked').value,
+    autoStop: $('opt-autostop').checked,
     lecture,
   };
 }
@@ -189,6 +191,10 @@ async function showActive(active) {
     $('btn-stop').disabled = true;
     await chrome.runtime.sendMessage({ type: 'recorder-stop' });
   });
+  $('btn-pause').addEventListener('click', async () => {
+    await chrome.runtime.sendMessage({ type: 'recorder-toggle-pause' });
+    refresh();
+  });
 
   const refresh = async () => {
     const status = await chrome.runtime.sendMessage({ type: 'recorder-status' }).catch(() => null);
@@ -198,7 +204,12 @@ async function showActive(active) {
     const labels = { ready: 'مستني تختار الشاشة', recording: 'جاري التسجيل', paused: 'متوقف مؤقتًا', finishing: 'بيحفظ ويرفع', done: 'خلص' };
     $('active-label').textContent = labels[status.state] || '';
     $('active-pill').className = `pill ${status.state === 'recording' ? 'pill-rec' : 'pill-warn'}`;
-    $('btn-stop').classList.toggle('hidden', !['recording', 'paused'].includes(status.state));
+    const live = ['recording', 'paused'].includes(status.state);
+    $('btn-stop').classList.toggle('hidden', !live);
+    $('btn-pause').classList.toggle('hidden', !live);
+    $('btn-pause').innerHTML = status.state === 'paused'
+      ? `${ICONS.play} <span>استكمال التسجيل</span>`
+      : `${ICONS.pause} <span>إيقاف مؤقت</span>`;
   };
   await refresh();
   setInterval(refresh, 1000);

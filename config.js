@@ -46,5 +46,6 @@ export const DEFAULT_OPTIONS = {
   save: { local: true, drive: true },
   quality: 'balanced',
   micDeviceId: '',
+  autoStop: true, // إنهاء التسجيل لوحده لما الميتينج يخلص (بعد عدّاد ممكن يتلغي)
   lecture: null, // { groupId, sessionId, courseName, batchCode, groupName, sessionNumber, sessionDate }
 };

@@ -27,8 +27,11 @@
       </div>
       <p id="active-title" class="muted" style="margin-top:6px"></p>
       <div class="row" style="margin-top:12px">
-        <button id="btn-focus" class="btn grow">فتح لوحة التسجيل</button>
+        <button id="btn-pause" class="btn grow"><span data-icon="pause"></span> <span>إيقاف مؤقت</span></button>
         <button id="btn-stop" class="btn btn-danger grow"><span data-icon="stop"></span> إنهاء التسجيل</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btn-focus" class="btn btn-link grow">فتح لوحة التسجيل</button>
       </div>
     </section>
 
@@ -70,6 +73,10 @@
           </div>
           <label class="switch"><input type="checkbox" id="src-mic" aria-label="تسجيل المايك"><span></span></label>
         </div>
+        <label class="check" style="margin-top:12px">
+          <input type="checkbox" id="opt-autostop">
+          <span><span class="bold">إنهاء التسجيل لوحده لما الميتينج يخلص</span><br><span class="muted">قبل ما يقفل بيديك 20 ثانية تلغي فيها لو لسه بتشرح</span></span>
+        </label>
       </div>
 
       <div class="card">
