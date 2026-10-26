@@ -1,5 +1,9 @@
 # Saber Recorder — إكستنشن تسجيل المحاضرات
 
+> **الـ backend مش في الريبو ده.** الإكستنشن بتكلّم Cloud Function اسمها `recorder` في مشروع Firebase `sg-tms-v2`، وكودها في ريبو السيستم `SaberGD/training-sys-updated-august-2026` في الملف `functions/recorder.js` (واختباراتها في `functions/recorder.test.js`). صفحة الربط `/#/recorder-link` في نفس الريبو (`pages/RecorderLink.tsx`).
+>
+> **ملف للمدربين:** `bash scripts/package.sh` بيطلّع `dist/Saber-Recorder-<version>.zip`.
+
 إكستنشن كروم بتسجّل المحاضرة أونلاين (Google Meet أو غيره):
 
 - **الشاشة كلها**: اللي بيتشارك وظاهر للطلبة، حتى لو الميتينج متصغّر.
