@@ -181,7 +181,7 @@ async function begin() {
 
 async function captureSources() {
   const { enabled } = session;
-  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS.balanced;
+  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS[DEFAULT_OPTIONS.quality];
   const audioInputs = {};
 
   // 1) الشاشة (وصوت النظام معاها). لازم ده الأول علشان نافذة الاختيار محتاجة ضغطة المستخدم.
@@ -291,7 +291,7 @@ function mixAudio(inputs) {
 }
 
 async function startRecorder() {
-  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS.balanced;
+  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS[DEFAULT_OPTIONS.quality];
   const tracks = [];
   if (session.videoTrack) tracks.push(session.videoTrack);
   if (session.audio) tracks.push(session.audio.dest.stream.getAudioTracks()[0]);
@@ -448,7 +448,7 @@ function showRecording() {
     if (confirm('إنهاء التسجيل؟')) stop();
   });
 
-  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS.balanced;
+  const quality = QUALITY_PRESETS[session.options.quality] || QUALITY_PRESETS[DEFAULT_OPTIONS.quality];
   $('rec-rate').textContent = `${quality.label} • ${quality.hint.split('•')[0].trim()}`;
   renderSave();
   session.tick = setInterval(tick, 250);

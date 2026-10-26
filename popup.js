@@ -61,7 +61,7 @@ async function loadOptions() {
   $('save-drive').checked = opts.save.drive;
   $('opt-autostop').checked = opts.autoStop !== false;
   const quality = document.querySelector(`input[name="quality"][value="${opts.quality}"]`)
-    || document.querySelector('input[name="quality"][value="balanced"]');
+    || document.querySelector(`input[name="quality"][value="${DEFAULT_OPTIONS.quality}"]`);
   quality.checked = true;
   syncSourceRows();
 }
@@ -183,6 +183,7 @@ function validate(options) {
 async function showActive(active) {
   $('active-view').classList.remove('hidden');
   $('setup-view').classList.add('hidden');
+  $('setup-actions').classList.add('hidden');
   $('btn-focus').addEventListener('click', async () => {
     await chrome.windows.update(active.windowId, { focused: true, state: 'normal' });
     window.close();

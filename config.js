@@ -44,7 +44,7 @@ export const DEFAULT_OPTIONS = {
   title: '',
   sources: { screen: true, systemAudio: true, mic: true },
   save: { local: true, drive: true },
-  quality: 'balanced',
+  quality: 'high',
   micDeviceId: '',
   autoStop: true, // إنهاء التسجيل لوحده لما الميتينج يخلص (بعد عدّاد ممكن يتلغي)
   lecture: null, // { groupId, sessionId, courseName, batchCode, groupName, sessionNumber, sessionDate }
