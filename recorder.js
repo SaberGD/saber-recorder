@@ -1,5 +1,6 @@
 import { CONFIG, QUALITY_PRESETS, DEFAULT_OPTIONS } from './config.js';
-import { getToken } from './lib/drive.js';
+import { completeUpload } from './lib/system.js';
+import { createLecturePicker, lectureLabel } from './lib/lecture-picker.js';
 import {
   getRecording, saveRecording, patchRecording, deleteLocalTemp, formatBytes, formatDuration,
 } from './lib/recordings.js';
@@ -46,7 +47,7 @@ init();
 async function init() {
   renderIcons();
   wireMessages();
-  watchSharedFolderWarning();
+  watchSystemLink();
   window.addEventListener('beforeunload', (e) => {
     if (['recording', 'paused', 'finishing'].includes(session.state)) e.preventDefault();
   });
@@ -93,7 +94,8 @@ function showReady() {
   const save = session.options.save;
   $('ready-save').innerHTML = [
     save.local && `<div class="row"><span class="pill pill-ok">✓</span> حفظ نسخة على الجهاز في Downloads/${CONFIG.LOCAL_FOLDER_NAME}</div>`,
-    save.drive && '<div class="row"><span class="pill pill-ok">✓</span> رفع تلقائي على Google Drive أثناء التسجيل</div>',
+    save.drive && `<div class="row"><span class="pill pill-ok">✓</span> رفع تلقائي على Drive الأكاديمية أثناء التسجيل</div>
+      <div class="muted" style="margin-top:4px; margin-inline-start:34px">المحاضرة: <b>${escapeHtml(lectureLabel(session.options.lecture))}</b></div>`,
   ].filter(Boolean).join('');
 
   $('btn-begin').addEventListener('click', begin);
@@ -317,6 +319,7 @@ async function startRecorder() {
     quality: session.options.quality,
     sources: session.available,
     save: session.options.save,
+    lecture: session.options.lecture || null,
     status: 'recording',
     bytes: 0,
     durationMs: 0,
@@ -495,7 +498,8 @@ async function finishSaving() {
   if (session.rec.save.local && !session.rec.local?.done) tasks.push(saveLocally());
   if (session.uploader) {
     session.uploader.setFinalSize(session.rec.bytes);
-    tasks.push(session.uploader.whenDone());
+    // الرفع بيكمّل في نفس الوقت اللي المدرب بيأكد فيه المحاضرة، وبعد الاتنين بنثبّت الملف في فولدره
+    tasks.push(Promise.all([session.uploader.whenDone(), confirmLecture()]).then(([file, lecture]) => finalizeDriveUpload(file, lecture)));
   }
   await Promise.all(tasks);
 
@@ -505,7 +509,7 @@ async function finishSaving() {
   setBadge('idle');
   document.title = 'Saber Recorder';
 
-  const where = [session.rec.save.local && 'على الجهاز', session.rec.save.drive && 'على Google Drive'].filter(Boolean).join(' و');
+  const where = [session.rec.save.local && 'على الجهاز', session.rec.save.drive && 'على Drive الأكاديمية'].filter(Boolean).join(' و');
   notify('التسجيل اتحفظ ✓', `"${session.rec.title}" اتحفظ ${where}.`);
   setFinish('check', 'التسجيل اتحفظ', `${durationLabel(session.rec)} • ${formatBytes(session.rec.bytes)} • ${where}`);
   renderSave();
@@ -649,28 +653,30 @@ function renderSave() {
       uploading: 'بيرفع...',
       retrying: `⚠ ${up.error} — هيحاول تاني لوحده`,
       'needs-auth': `⚠ ${up.error}`,
-      done: '✓ اترفع على Drive',
+      failed: `✗ ${up.error}`,
+      done: rec.drive?.completed ? `✓ اترفع في: ${rec.drive.folderPath || up.folderPath}` : '✓ اترفع، مستني تأكيد المحاضرة',
     };
     parts.push(`<div class="row"><span class="source-icon">${ICONS.drive}</span><div class="grow">
-        <div class="row" style="margin:0"><span class="bold grow">Google Drive</span><span class="muted ltr">${formatBytes(up.uploaded)} / ${formatBytes(total)}</span></div>
+        <div class="row" style="margin:0"><span class="bold grow">Drive الأكاديمية</span><span class="muted ltr">${formatBytes(up.uploaded)} / ${formatBytes(total)}</span></div>
         <div class="progress" style="margin-top:6px"><div style="width:${pct}%"></div></div>
         <div class="muted" style="margin-top:4px">${texts[up.state] || ''}</div>
-        ${session.sharedFolderWarning ? `<div class="notice notice-warn" style="margin-top:6px">${escapeHtml(session.sharedFolderWarning)}</div>` : ''}
+        ${session.completeError ? `<div class="notice notice-danger" style="margin-top:6px">${escapeHtml(session.completeError)}</div>` : ''}
       </div></div>
-      ${up.state === 'needs-auth' ? '<button class="btn btn-primary btn-block" data-action="reauth" style="margin-top:8px">إعادة ربط حساب Google</button>' : ''}`);
+      ${up.state === 'needs-auth' ? '<button class="btn btn-primary btn-block" data-action="reauth" style="margin-top:8px">ربط الإكستنشن بالسيستم تاني</button>' : ''}
+      ${up.state === 'failed' || session.completeError ? '<button class="btn btn-block" data-action="retry-drive" style="margin-top:8px">حاول تاني</button>' : ''}`);
   }
 
   const html = `<div class="card-title">الحفظ</div>${parts.join('<div style="height:10px"></div>')}`;
   const target = session.state === 'recording' || session.state === 'paused' ? $('rec-save') : $('finish-save');
   target.innerHTML = html;
   target.querySelector('[data-action="retry-local"]')?.addEventListener('click', () => session.local.retry?.());
-  target.querySelector('[data-action="reauth"]')?.addEventListener('click', async () => {
-    try {
-      await getToken({ interactive: true });
-      session.uploader.resumeAfterAuth();
-    } catch (err) {
-      alert(err.message);
-    }
+  target.querySelector('[data-action="reauth"]')?.addEventListener('click', () => {
+    // بعد الربط watchSystemLink بيكمّل الرفع لوحده
+    chrome.runtime.sendMessage({ type: 'link-system' });
+  });
+  target.querySelector('[data-action="retry-drive"]')?.addEventListener('click', () => {
+    if (session.completeError) session.retryComplete?.();
+    else session.uploader.resumeAfterAuth();
   });
 }
 
@@ -725,14 +731,96 @@ function wireMessages() {
   });
 }
 
-// لو فولدر الأكاديمية مبقاش متاح أثناء التسجيل ده، drive.js بيرجع لـ Drive الشخصي ويسيب تحذير نعرضه هنا
-function watchSharedFolderWarning() {
+// لو الربط بالسيستم اتجدد (المدرب عمل ربط تاني) نكمّل الرفع اللي كان واقف
+function watchSystemLink() {
   chrome.storage.onChanged.addListener((changes, area) => {
-    const warning = area === 'local' && changes.driveAuth?.newValue?.sharedFolderWarning;
-    if (!warning || warning === changes.driveAuth.oldValue?.sharedFolderWarning) return;
-    session.sharedFolderWarning = warning;
-    renderSave();
+    if (area !== 'local' || !changes.systemAuth?.newValue) return;
+    if (session.uploader?.state === 'needs-auth') session.uploader.resumeAfterAuth();
+    if (session.completeError) session.retryComplete?.();
   });
+}
+
+/* ---------- تأكيد المحاضرة بعد التسجيل ---------- */
+
+// "التسجيل ده لمحاضرة كذا؟" ولو لأ المدرب يختار الصح. بيرجع المحاضرة النهائية.
+function confirmLecture() {
+  const card = $('finish-lecture');
+  const current = session.rec.lecture;
+  if (session.rec.drive?.completed) return Promise.resolve(current);
+  card.classList.remove('hidden');
+
+  return new Promise((resolve) => {
+    const ask = () => {
+      card.innerHTML = `
+        <div class="card-title">اتأكد من المحاضرة</div>
+        <p>التسجيل ده لـ <b>${escapeHtml(lectureLabel(current))}</b>؟</p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn-primary grow" data-yes>أيوه، صح</button>
+          <button class="btn grow" data-change>لأ، غيّر</button>
+        </div>`;
+      card.querySelector('[data-yes]').addEventListener('click', () => done(current));
+      card.querySelector('[data-change]').addEventListener('click', change);
+    };
+    const change = () => {
+      card.innerHTML = `<div class="card-title">اختار المحاضرة الصح</div><div data-picker></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn-primary grow" data-save disabled>تأكيد</button>
+          <button class="btn grow" data-back>رجوع</button>
+        </div>`;
+      let picked = null;
+      const save = card.querySelector('[data-save]');
+      const picker = createLecturePicker(card.querySelector('[data-picker]'), {
+        onChange(value) {
+          picked = value;
+          save.disabled = !value;
+        },
+      });
+      picker.load({ initial: current });
+      save.addEventListener('click', () => picked && done(picked));
+      card.querySelector('[data-back]').addEventListener('click', ask);
+    };
+    const done = async (lecture) => {
+      card.innerHTML = `<div class="card-title">المحاضرة</div><p>✓ ${escapeHtml(lectureLabel(lecture))}</p>`;
+      session.rec = await patchRecording(session.rec.id, { lecture });
+      // لو الرفع لسه مفتحش جلسة (أو وقف علشان مكانش فيه محاضرة) يبدأ في الفولدر الصح على طول
+      const up = session.uploader;
+      if (up && !up.sessionUri) {
+        up.rec = session.rec;
+        if (up.state === 'failed') up.resumeAfterAuth();
+      }
+      resolve(lecture);
+    };
+    // تسجيل قديم ملوش محاضرة محفوظة: نختار على طول
+    if (current) ask();
+    else change();
+  });
+}
+
+// بعد الرفع والتأكيد: السيستم بيتأكد من الملف، ولو المحاضرة اتغيرت بينقله لفولدرها الصح
+async function finalizeDriveUpload(file, lecture) {
+  if (session.rec.drive?.completed) return;
+  while (true) {
+    try {
+      session.completeError = '';
+      renderSave();
+      const res = await completeUpload(session.rec.drive.recordingId || session.uploader.recordingId, {
+        fileId: file.id,
+        groupId: lecture.groupId,
+        sessionId: lecture.sessionId,
+        bytes: session.rec.bytes,
+        durationSec: Math.round((session.rec.durationMs || 0) / 1000),
+      });
+      session.rec = await patchRecording(session.rec.id, {
+        drive: { completed: true, webViewLink: res.webViewLink || session.rec.drive?.webViewLink || '', folderPath: res.folderPath || '' },
+      });
+      renderSave();
+      return;
+    } catch (err) {
+      session.completeError = `مقدرتش أثبّت التسجيل في فولدر المحاضرة: ${err.message}`;
+      renderSave();
+      await new Promise((resolve) => { session.retryComplete = resolve; });
+    }
+  }
 }
 
 function stopAllStreams() {

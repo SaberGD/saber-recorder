@@ -37,7 +37,10 @@
       <div id="tab-notice" class="notice notice-info"></div>
 
       <div class="card">
-        <div class="card-title">اسم المحاضرة</div>
+        <div class="card-title">المحاضرة — اتأكد منها قبل ما تبدأ</div>
+        <div id="system-account"></div>
+        <div id="lecture-picker" class="hidden" style="margin-top:8px"></div>
+        <label class="small muted" for="title" style="display:block;margin-top:10px">اسم التسجيل</label>
         <input id="title" type="text" placeholder="مثال: AutoCAD — جروب 12 — المحاضرة 5" maxlength="120">
       </div>
 
@@ -82,9 +85,8 @@
         </label>
         <label class="check">
           <input type="checkbox" id="save-drive">
-          <span class="grow"><span class="bold">رفع تلقائي على Google Drive</span><br><span class="muted">بيترفع وانت بتسجّل، ولو النت فصل بيكمّل لوحده</span></span>
+          <span class="grow"><span class="bold">رفع تلقائي على Drive الأكاديمية</span><br><span class="muted">في فولدر الكورس ← الجروب ← المحاضرة. بيترفع وانت بتسجّل، ولو النت فصل بيكمّل لوحده</span></span>
         </label>
-        <div id="drive-account" style="margin-top:8px; margin-inline-start:26px"></div>
       </div>
 
       <div id="start-error" class="notice notice-danger hidden"></div>

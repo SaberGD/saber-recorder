@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Saber Group Recorder",
   "short_name": "Saber Recorder",
-  "version": "1.1.0",
-  "description": "تسجيل المحاضرات أونلاين (الشاشة وصوت الجهاز والمايك) مع حفظ محلي ورفع تلقائي على Google Drive.",
+  "version": "1.2.0",
+  "description": "تسجيل المحاضرات أونلاين (الشاشة وصوت الجهاز والمايك) مع حفظ على الجهاز ورفع تلقائي على Drive الأكاديمية في فولدر المحاضرة.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt7pyzxg4AVNYz+XOL1r+auFachiAFxLuWaZoQnK2QF2GTdwcIvDUBw2B2SxE+h07MMPeV8UwSdObtfhzpTMgGCJlXHdIlFivdCpkEYU17r/QwygggNIYpd+Z+j1StaQLPfQm/jL01ipLv07jbd8bTI2QGr6Bfp65DEwvcoaetzK2oxIX9OSAGml0fKBi4viOh4Vi8dSG6634cYmodfyS6nVi2nSSnxvz/F8x7Aqb5uq6bXhTLGu9CLtpa18LA+EYmxe70EhcBDlLEdi+F3Br21xa2v2GgO52jEHPAnu4FZAoXU1B2meHeWW+4DT4H+BVZjmCNLRmrC8gsFxnsYh/UQIDAQAB",
   "minimum_chrome_version": "116",
   "icons": {
@@ -30,12 +30,11 @@
     "storage",
     "unlimitedStorage",
     "downloads",
-    "notifications",
-    "identity"
+    "notifications"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*",
-    "https://oauth2.googleapis.com/*"
+    "https://us-central1-sg-tms-v2.cloudfunctions.net/*"
   ],
   "externally_connectable": {
     "matches": [

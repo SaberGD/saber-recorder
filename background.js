@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { getToken, disconnectDrive, getDriveAccount, setSharedRoot } from './lib/drive.js';
+import { saveSystemLink, unlinkSystem } from './lib/system.js';
 import { listRecordings, patchRecording, getActiveRecorder } from './lib/recordings.js';
 
 const RECORDER_SIZE = { width: 440, height: 720 };
@@ -48,62 +48,56 @@ const handlers = {
     return {};
   },
 
-  // نافذة ربط جوجل بتقفل الـ popup، فالربط بيتعمل هنا في الخلفية
-  async 'drive-connect'() {
-    await getToken({ interactive: true });
+  // ربط الإكستنشن بحساب المدرب على السيستم: صفحة على دومين السيستم بيسجّل فيها دخول ويوافق
+  async 'link-system'() {
+    const params = new URLSearchParams({ ext: chrome.runtime.id });
+    const win = await chrome.windows.create({ url: `${CONFIG.LINK_PAGE_URL}?${params}`, type: 'popup', width: 520, height: 640 });
+    await chrome.storage.session.set({ linkWindowId: win.id, linkPageReady: false });
+    setTimeout(() => checkLinkPageLoaded(win.id), LINK_READY_TIMEOUT_MS);
     return {};
   },
 
-  async 'drive-disconnect'() {
-    await disconnectDrive();
-    return {};
-  },
-
-  // صفحة الـ Picker على دومين السيستم، لأن MV3 مانع تحميل سكربت جوجل جوه صفحات الإكستنشن
-  async 'pick-shared-folder'() {
-    const account = await getDriveAccount();
-    if (!account) throw new Error('اربط حساب Google الأول');
-    const params = new URLSearchParams({ ext: chrome.runtime.id, folder: CONFIG.SHARED_FOLDER_ID, hint: account.email });
-    const win = await chrome.windows.create({ url: `${CONFIG.PICKER_PAGE_URL}?${params}`, type: 'popup', width: 760, height: 640 });
-    await chrome.storage.session.set({ pickerWindowId: win.id, pickerReady: false });
-    setTimeout(() => checkPickerPageLoaded(win.id), PICKER_READY_TIMEOUT_MS);
+  async 'unlink-system'() {
+    await unlinkSystem();
     return {};
   },
 };
 
-const PICKER_ORIGIN = new URL(CONFIG.PICKER_PAGE_URL).origin;
-const PICKER_READY_TIMEOUT_MS = 12_000;
+const LINK_READY_TIMEOUT_MS = 15_000;
 
-// لو صفحة الـ Picker مبعتتش إنها اتفتحت، يبقى السيستم لسه معلهوش deploy للصفحة (بيفتح الصفحة الرئيسية بدالها)
-async function checkPickerPageLoaded(windowId) {
-  const { pickerWindowId, pickerReady } = await chrome.storage.session.get(['pickerWindowId', 'pickerReady']);
-  if (pickerReady || pickerWindowId !== windowId) return;
+// لو صفحة الربط مبعتتش إنها اتفتحت، يبقى السيستم لسه معلهوش deploy للصفحة (بيفتح الصفحة الرئيسية بدالها)
+async function checkLinkPageLoaded(windowId) {
+  const { linkWindowId, linkPageReady } = await chrome.storage.session.get(['linkWindowId', 'linkPageReady']);
+  if (linkPageReady || linkWindowId !== windowId) return;
   await chrome.windows.remove(windowId).catch(() => {});
-  chrome.notifications.create('picker-unavailable', {
+  chrome.notifications.create('link-unavailable', {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
-    title: 'صفحة اختيار الفولدر مش متاحة',
-    message: 'صفحة اختيار فولدر الأكاديمية لسه مش موجودة على السيستم أو مفتحتش. التسجيلات هتفضل تترفع على Drive الشخصي. كلّم الأدمن.',
+    title: 'صفحة الربط مش متاحة',
+    message: 'صفحة ربط الإكستنشن لسه مش موجودة على السيستم أو مفتحتش. التسجيل والحفظ على الجهاز شغالين عادي. كلّم الأدمن.',
   });
 }
 
-// الرسالة الوحيدة اللي بنقبلها من برّه: ID الفولدر اللي اتاختار، ومن صفحة السيستم بس.
-// التوكن بتاع الصفحة مبيتبعتش هنا، والإكستنشن بتتأكد من الفولدر بالتوكن بتاعها.
+// الرسايل اللي بنقبلها من برّه: من صفحة الربط على دومين السيستم بس
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-  if (sender.origin === PICKER_ORIGIN && message?.type === 'picker-page-ready') {
-    chrome.storage.session.set({ pickerReady: true }).then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  if (sender.origin !== PICKER_ORIGIN || message?.type !== 'shared-folder-picked' || typeof message.folderId !== 'string') {
+  if (sender.origin !== CONFIG.SYSTEM_ORIGIN) {
     sendResponse({ ok: false, error: 'رسالة غير مسموح بيها' });
     return false;
   }
-  setSharedRoot(message.folderId)
-    .then(async (folder) => {
-      sendResponse({ ok: true, folderName: folder.name });
-      const { pickerWindowId } = await chrome.storage.session.get('pickerWindowId');
+  if (message?.type === 'link-page-ready') {
+    chrome.storage.session.set({ linkPageReady: true }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (message?.type !== 'recorder-linked') {
+    sendResponse({ ok: false, error: 'رسالة غير مسموح بيها' });
+    return false;
+  }
+  saveSystemLink(message)
+    .then(async () => {
+      sendResponse({ ok: true });
+      const { linkWindowId } = await chrome.storage.session.get('linkWindowId');
       // نسيب المدرب يشوف رسالة النجاح ثانية ونص وبعدين نقفل النافذة
-      if (pickerWindowId) setTimeout(() => chrome.windows.remove(pickerWindowId).catch(() => {}), 1500);
+      if (linkWindowId) setTimeout(() => chrome.windows.remove(linkWindowId).catch(() => {}), 1500);
     })
     .catch((err) => sendResponse({ ok: false, error: err.message }));
   return true;

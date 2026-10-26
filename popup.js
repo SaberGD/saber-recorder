@@ -1,5 +1,6 @@
 import { CONFIG, QUALITY_PRESETS, DEFAULT_OPTIONS } from './config.js';
-import { isDriveConfigured, getDriveAccount } from './lib/drive.js';
+import { getSystemAccount } from './lib/system.js';
+import { createLecturePicker, lectureLabel } from './lib/lecture-picker.js';
 import {
   listRecordings, removeRecording, needsAttention, getActiveRecorder, formatBytes, formatDuration,
 } from './lib/recordings.js';
@@ -9,7 +10,10 @@ const $ = (id) => document.getElementById(id);
 const SOURCES = ['screen', 'systemAudio', 'mic'];
 
 let sourceTab = null;
-let driveAccount = null;
+let systemAccount = null;
+let picker = null;
+let lecture = null;
+let titleEdited = false;
 
 init();
 
@@ -23,13 +27,14 @@ async function init() {
 
   await loadOptions();
   await detectSourceTab();
-  await renderDriveAccount();
+  await renderSystemAccount();
   await renderRecordings(active?.recId);
 
   for (const s of SOURCES) $(`src-${s}`).addEventListener('change', syncSourceRows);
   $('btn-start').addEventListener('click', start);
+  $('title').addEventListener('input', () => { titleEdited = true; });
   chrome.storage.onChanged.addListener((changes) => {
-    if (changes.driveAuth) renderDriveAccount();
+    if (changes.systemAuth) renderSystemAccount();
     if (changes.recordings) renderRecordings(active?.recId);
   });
 }
@@ -53,7 +58,7 @@ async function loadOptions() {
   };
   for (const s of SOURCES) $(`src-${s}`).checked = opts.sources[s];
   $('save-local').checked = opts.save.local;
-  $('save-drive').checked = opts.save.drive && isDriveConfigured();
+  $('save-drive').checked = opts.save.drive;
   const quality = document.querySelector(`input[name="quality"][value="${opts.quality}"]`)
     || document.querySelector('input[name="quality"][value="balanced"]');
   quality.checked = true;
@@ -90,53 +95,42 @@ async function detectSourceTab() {
   $('title').value = isMeet && tabTitle && !looksLikeCode ? `${tabTitle} — ${date}` : `محاضرة ${date}`;
 }
 
-async function renderDriveAccount() {
-  const el = $('drive-account');
-  const driveBox = $('save-drive');
-  if (!isDriveConfigured()) {
-    // نسخة الحفظ على الجهاز بس: منعرضش خيار Drive خالص، والحفظ المحلي بيبقى إجباري
-    driveBox.checked = false;
-    driveBox.closest('label').classList.add('hidden');
-    el.classList.add('hidden');
-    $('save-local').checked = true;
-    $('save-local').disabled = true;
-    return;
-  }
-  driveAccount = await getDriveAccount();
-  if (driveAccount) {
-    const shared = driveAccount.sharedRootId;
-    const notices = [];
-    if (driveAccount.sharedFolderWarning) {
-      notices.push(`<div class="notice notice-warn" style="margin-top:6px">${escapeHtml(driveAccount.sharedFolderWarning)}</div>`);
-    } else if (CONFIG.SHARED_FOLDER_ID && !shared) {
-      notices.push('<div class="notice notice-info" style="margin-top:6px">الأكاديمية عاملة فولدر مشترك للتسجيلات. اختاره علشان تسجيلاتك تتجمع فيه.</div>');
-    }
+async function renderSystemAccount() {
+  const el = $('system-account');
+  systemAccount = await getSystemAccount();
+  if (!systemAccount) {
+    picker = null;
+    lecture = null;
+    $('lecture-picker').classList.add('hidden');
     el.innerHTML = `
-      <div class="row"><span class="pill pill-ok">✓</span><span class="small grow ltr" style="text-align:right">${escapeHtml(driveAccount.email)}</span>
-        <button class="btn btn-link" id="btn-drive-change">تغيير الحساب</button></div>
-      <div class="row" style="margin-top:4px">
-        <span class="muted small">مكان الرفع:</span>
-        <span class="small bold grow">${shared ? escapeHtml(driveAccount.sharedRootName || 'فولدر الأكاديمية') : 'Drive الشخصي'}</span>
-        <button class="btn btn-link" id="btn-pick-folder">${shared ? 'تغيير الفولدر' : 'اختار فولدر الأكاديمية'}</button>
-      </div>
-      ${notices.join('')}`;
-    $('btn-drive-change').addEventListener('click', async () => {
-      await chrome.runtime.sendMessage({ type: 'drive-disconnect' });
-      connectDrive();
-    });
-    $('btn-pick-folder').addEventListener('click', async () => {
-      const res = await chrome.runtime.sendMessage({ type: 'pick-shared-folder' });
+      <div class="notice notice-info">اربط الإكستنشن بحسابك على السيستم مرة واحدة، علشان تعرف محاضراتك وترفع كل تسجيل في فولدر محاضرته.</div>
+      <button class="btn btn-primary btn-block" id="btn-link" style="margin-top:8px">ربط بحسابي على السيستم</button>`;
+    $('btn-link').addEventListener('click', async () => {
+      // الـ popup هيتقفل لما نافذة الربط تفتح، والربط بيكمل في الخلفية
+      const res = await chrome.runtime.sendMessage({ type: 'link-system' });
       if (res?.ok) window.close();
     });
-  } else {
-    el.innerHTML = '<button class="btn btn-link" id="btn-drive-connect" style="padding-inline:0">ربط حساب Google ←</button>';
-    $('btn-drive-connect').addEventListener('click', connectDrive);
+    return;
   }
-}
 
-function connectDrive() {
-  // الـ popup هيتقفل لما نافذة جوجل تفتح، والربط بيكمل في الخلفية
-  chrome.runtime.sendMessage({ type: 'drive-connect' });
+  el.innerHTML = `<div class="row"><span class="pill pill-ok">✓</span>
+    <span class="small grow">${escapeHtml(systemAccount.name || systemAccount.email)} <span class="muted ltr">${escapeHtml(systemAccount.email)}</span></span>
+    <button class="btn btn-link" id="btn-unlink">فصل</button></div>`;
+  $('btn-unlink').addEventListener('click', async () => {
+    if (!confirm('هتفصل الإكستنشن عن حسابك على السيستم؟ التسجيلات هتتحفظ على الجهاز بس لحد ما تربطها تاني.')) return;
+    await chrome.runtime.sendMessage({ type: 'unlink-system' });
+  });
+
+  if (!picker) {
+    $('lecture-picker').classList.remove('hidden');
+    picker = createLecturePicker($('lecture-picker'), {
+      onChange(value) {
+        lecture = value;
+        if (value && !titleEdited) $('title').value = lectureLabel(value);
+      },
+    });
+    await picker.load({ meetUrl: sourceTab?.url || '' });
+  }
 }
 
 function readOptions() {
@@ -145,6 +139,7 @@ function readOptions() {
     sources: Object.fromEntries(SOURCES.map((s) => [s, $(`src-${s}`).checked])),
     save: { local: $('save-local').checked, drive: $('save-drive').checked },
     quality: document.querySelector('input[name="quality"]:checked').value,
+    lecture,
   };
 }
 
@@ -156,7 +151,7 @@ async function start() {
   if (error) return;
 
   const { lastOptions } = await chrome.storage.local.get('lastOptions');
-  await chrome.storage.local.set({ lastOptions: { ...lastOptions, ...options, title: '' } });
+  await chrome.storage.local.set({ lastOptions: { ...lastOptions, ...options, title: '', lecture: null } });
 
   const res = await chrome.runtime.sendMessage({ type: 'open-recorder', options, sourceTabId: sourceTab?.id ?? null });
   if (!res?.ok) {
@@ -172,10 +167,13 @@ function validate(options) {
     return 'لازم تختار حاجة واحدة على الأقل تتسجّل.';
   }
   if (!options.save.local && !options.save.drive) {
-    return 'اختار مكان الحفظ: على الجهاز أو Google Drive أو الاتنين.';
+    return 'اختار مكان الحفظ: على الجهاز أو Drive الأكاديمية أو الاتنين.';
   }
-  if (options.save.drive && !driveAccount) {
-    return 'اربط حساب Google الأول، أو شيل علامة الرفع على Drive.';
+  if (options.save.drive && !systemAccount) {
+    return 'اربط الإكستنشن بحسابك على السيستم الأول، أو شيل علامة الرفع على Drive.';
+  }
+  if (options.save.drive && !options.lecture) {
+    return 'اختار الجروب والمحاضرة علشان التسجيل يترفع في مكانه الصح.';
   }
   return '';
 }

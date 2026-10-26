@@ -1,18 +1,11 @@
-// إعدادات الإكستنشن. الحاجة الوحيدة اللي لازم تتغير هي OAUTH_CLIENT_ID (شوف README.md).
+// إعدادات الإكستنشن (شوف README.md).
 export const CONFIG = {
-  // Client ID من نوع "Web application" في Google Cloud Console،
-  // ومضاف عليه Redirect URI: https://koaoinnnobkcaabcgnhiajnolamnceoi.chromiumapp.org/
-  OAUTH_CLIENT_ID: '',
+  // السيستم: صفحة ربط الإكستنشن بحساب المدرب (التطبيق بيستخدم HashRouter، علشان كده فيه #)
+  SYSTEM_ORIGIN: 'https://training.sabergroupacademy.com',
+  LINK_PAGE_URL: 'https://training.sabergroupacademy.com/#/recorder-link',
 
-  // الفولدر اللي هيتعمل على Google Drive الشخصي للمدرب لو مااختارش فولدر الأكاديمية
-  DRIVE_FOLDER_NAME: 'Saber Group - تسجيلات المحاضرات',
-
-  // فولدر الأكاديمية المشترك (من رابطه: drive.google.com/drive/folders/<ID>).
-  // ده بيفتح الـ Picker على الفولدر على طول بس، ومبيديش أي صلاحية لوحده: المدرب لازم يختاره بنفسه.
-  SHARED_FOLDER_ID: '',
-
-  // صفحة اختيار الفولدر على السيستم (التطبيق بيستخدم HashRouter، علشان كده فيه #)
-  PICKER_PAGE_URL: 'https://training.sabergroupacademy.com/#/drive-picker',
+  // الـ backend (Cloud Function) اللي بيفتح جلسات الرفع على Drive الأكاديمية
+  RECORDER_API: 'https://us-central1-sg-tms-v2.cloudfunctions.net/recorder',
 
   // الفولدر جوه Downloads اللي بيتحفظ فيه التسجيل محليًا
   LOCAL_FOLDER_NAME: 'Saber Recordings',
@@ -53,4 +46,5 @@ export const DEFAULT_OPTIONS = {
   save: { local: true, drive: true },
   quality: 'balanced',
   micDeviceId: '',
+  lecture: null, // { groupId, sessionId, courseName, batchCode, groupName, sessionNumber, sessionDate }
 };
