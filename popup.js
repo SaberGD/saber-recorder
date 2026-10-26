@@ -94,9 +94,12 @@ async function renderDriveAccount() {
   const el = $('drive-account');
   const driveBox = $('save-drive');
   if (!isDriveConfigured()) {
+    // نسخة الحفظ على الجهاز بس: منعرضش خيار Drive خالص، والحفظ المحلي بيبقى إجباري
     driveBox.checked = false;
-    driveBox.disabled = true;
-    el.innerHTML = '<span class="muted">الرفع على Drive لسه متظبطش (OAUTH_CLIENT_ID في config.js).</span>';
+    driveBox.closest('label').classList.add('hidden');
+    el.classList.add('hidden');
+    $('save-local').checked = true;
+    $('save-local').disabled = true;
     return;
   }
   driveAccount = await getDriveAccount();
