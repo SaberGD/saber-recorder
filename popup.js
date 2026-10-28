@@ -14,6 +14,9 @@ let systemAccount = null;
 let picker = null;
 let lecture = null;
 let titleEdited = false;
+let defaultTitle = '';
+// تسجيل اجتماع: مش مربوط بجروب ولا محاضرة، بيترفع Drive في "تسجيلات عامة" ومش بيتبعت تليجرام
+let meeting = false;
 
 init();
 
@@ -33,6 +36,7 @@ async function init() {
   for (const s of SOURCES) $(`src-${s}`).addEventListener('change', syncSourceRows);
   $('btn-start').addEventListener('click', start);
   $('title').addEventListener('input', () => { titleEdited = true; });
+  $('opt-meeting').addEventListener('change', (e) => setMeeting(e.target.checked));
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.systemAuth) renderSystemAccount();
     if (changes.recordings) renderRecordings(active?.recId);
@@ -94,6 +98,17 @@ async function detectSourceTab() {
   const tabTitle = (tab?.title || '').replace(/^Meet\s*[-–—:]\s*/i, '').trim();
   const looksLikeCode = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(tabTitle) || /google meet/i.test(tabTitle);
   $('title').value = isMeet && tabTitle && !looksLikeCode ? `${tabTitle} — ${date}` : `محاضرة ${date}`;
+  defaultTitle = $('title').value;
+}
+
+function setMeeting(on) {
+  meeting = on;
+  $('lecture-heading').textContent = on ? 'الاجتماع' : 'المحاضرة';
+  $('lecture-picker').classList.toggle('hidden', on || !picker);
+  if (!titleEdited) {
+    const date = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
+    $('title').value = on ? `اجتماع — ${date}` : (lecture ? lectureLabel(lecture) : defaultTitle);
+  }
 }
 
 async function renderSystemAccount() {
@@ -123,11 +138,11 @@ async function renderSystemAccount() {
   });
 
   if (!picker) {
-    $('lecture-picker').classList.remove('hidden');
+    $('lecture-picker').classList.toggle('hidden', meeting);
     picker = createLecturePicker($('lecture-picker'), {
       onChange(value) {
         lecture = value;
-        if (value && !titleEdited) $('title').value = lectureLabel(value);
+        if (value && !titleEdited && !meeting) $('title').value = lectureLabel(value);
       },
     });
     await picker.load({ meetUrl: sourceTab?.url || '' });
@@ -141,7 +156,8 @@ function readOptions() {
     save: { local: $('save-local').checked, drive: $('save-drive').checked },
     quality: document.querySelector('input[name="quality"]:checked').value,
     autoStop: $('opt-autostop').checked,
-    lecture,
+    kind: meeting ? 'meeting' : 'lecture',
+    lecture: meeting ? null : lecture,
   };
 }
 
@@ -153,7 +169,7 @@ async function start() {
   if (error) return;
 
   const { lastOptions } = await chrome.storage.local.get('lastOptions');
-  await chrome.storage.local.set({ lastOptions: { ...lastOptions, ...options, title: '', lecture: null } });
+  await chrome.storage.local.set({ lastOptions: { ...lastOptions, ...options, title: '', lecture: null, kind: 'lecture' } });
 
   const res = await chrome.runtime.sendMessage({ type: 'open-recorder', options, sourceTabId: sourceTab?.id ?? null });
   if (!res?.ok) {
@@ -174,7 +190,7 @@ function validate(options) {
   if (options.save.drive && !systemAccount) {
     return 'اربط الإكستنشن بحسابك على السيستم الأول، أو شيل علامة الرفع على Drive.';
   }
-  if (options.save.drive && !options.lecture) {
+  if (options.save.drive && options.kind !== 'meeting' && !options.lecture) {
     return 'اختار الجروب والمحاضرة علشان التسجيل يترفع في مكانه الصح.';
   }
   return '';

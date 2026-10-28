@@ -95,7 +95,9 @@ function showReady() {
   $('ready-save').innerHTML = [
     save.local && `<div class="row"><span class="pill pill-ok">✓</span> حفظ نسخة على الجهاز في Downloads/${CONFIG.LOCAL_FOLDER_NAME}</div>`,
     save.drive && `<div class="row"><span class="pill pill-ok">✓</span> رفع تلقائي على Drive الأكاديمية أثناء التسجيل</div>
-      <div class="muted" style="margin-top:4px; margin-inline-start:34px">المحاضرة: <b>${escapeHtml(lectureLabel(session.options.lecture))}</b></div>`,
+      <div class="muted" style="margin-top:4px; margin-inline-start:34px">${session.options.kind === 'meeting'
+        ? 'اجتماع: فولدر <b>تسجيلات عامة</b>، ومش بيتبعت تليجرام'
+        : `المحاضرة: <b>${escapeHtml(lectureLabel(session.options.lecture))}</b>`}</div>`,
   ].filter(Boolean).join('');
 
   $('btn-begin').addEventListener('click', begin);
@@ -319,7 +321,8 @@ async function startRecorder() {
     quality: session.options.quality,
     sources: session.available,
     save: session.options.save,
-    lecture: session.options.lecture || null,
+    kind: session.options.kind === 'meeting' ? 'meeting' : 'lecture',
+    lecture: session.options.kind === 'meeting' ? null : session.options.lecture || null,
     status: 'recording',
     bytes: 0,
     durationMs: 0,
@@ -569,7 +572,9 @@ async function finishSaving() {
   if (session.uploader) {
     session.uploader.setFinalSize(session.rec.bytes);
     // الرفع بيكمّل في نفس الوقت اللي المدرب بيأكد فيه المحاضرة، وبعد الاتنين بنثبّت الملف في فولدره
-    tasks.push(Promise.all([session.uploader.whenDone(), confirmLecture()]).then(([file, lecture]) => finalizeDriveUpload(file, lecture)));
+    // الاجتماع ملوش محاضرة يتأكد منها
+    const confirmed = session.rec.kind === 'meeting' ? Promise.resolve(null) : confirmLecture();
+    tasks.push(Promise.all([session.uploader.whenDone(), confirmed]).then(([file, lecture]) => finalizeDriveUpload(file, lecture)));
   }
   await Promise.all(tasks);
 
@@ -897,20 +902,19 @@ async function finalizeDriveUpload(file, lecture) {
       renderSave();
       const res = await completeUpload(session.rec.drive.recordingId || session.uploader.recordingId, {
         fileId: file.id,
-        groupId: lecture.groupId,
-        sessionId: lecture.sessionId,
+        ...(lecture ? { groupId: lecture.groupId, sessionId: lecture.sessionId } : {}),
         bytes: session.rec.bytes,
         durationSec: Math.round((session.rec.durationMs || 0) / 1000),
       });
       session.rec = await patchRecording(session.rec.id, {
         // رقم الجزء الحقيقي من السيستم (لو المحاضرة اتغيرت ممكن يتغير)
-        lecture: { ...lecture, part: res.part || 1 },
+        lecture: lecture ? { ...lecture, part: res.part || 1 } : null,
         drive: { completed: true, webViewLink: res.webViewLink || session.rec.drive?.webViewLink || '', folderPath: res.folderPath || '' },
       });
       renderSave();
       return;
     } catch (err) {
-      session.completeError = `مقدرتش أثبّت التسجيل في فولدر المحاضرة: ${err.message}`;
+      session.completeError = `مقدرتش أثبّت التسجيل في فولدره على Drive: ${err.message}`;
       renderSave();
       await new Promise((resolve) => { session.retryComplete = resolve; });
     }

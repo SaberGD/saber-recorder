@@ -54,7 +54,7 @@ A trainer records an online lecture with the **Saber Recorder** Chrome extension
 
 ## 3. Chrome extension (`SaberGD/saber-recorder`)
 
-MV3, Chrome 116+. Current version **1.3.4** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size).
+MV3, Chrome 116+. Current version **1.3.5** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings).
 
 | File | Role |
 |---|---|
@@ -99,7 +99,7 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 | `GET /groups` | srec | Active groups, the trainer's first. |
 | `GET /groups/:id/sessions` | srec | Lectures of a group, with `myParts` and `jointGroups` count. |
 | `GET /detect?meet=` | srec | Guess the lecture from the Meet link (or today's schedule). `confident` when there is one match today, or all of today's matches are copies of the same joint lecture. |
-| `POST /uploads` | srec | Create/find folders (lock in `recorderDriveFolders`), number the part, open a Drive resumable session. Returns `{recordingId, uploadUrl, folderPath, fileName, part}`. The extension uploads bytes straight to `uploadUrl`. |
+| `POST /uploads` | srec | Create/find folders (lock in `recorderDriveFolders`), number the part, open a Drive resumable session. Returns `{recordingId, uploadUrl, folderPath, fileName, part}`. The extension uploads bytes straight to `uploadUrl`. With `{kind:"meeting", title}` (no group/lecture) the file goes to `تسجيلات عامة / YYYY-MM / <title> - <trainer> - <date time>` and is never queued for Telegram. |
 | `POST /uploads/:id/complete` | srec | Verify the file is in the recording's folder; if the trainer changed the lecture, move + rename; set `status: uploaded`, `telegramStatus: pending`. For a joint lecture, create Drive shortcuts in the other groups' lecture folders. |
 | `GET /automation/pending` | key | Recordings waiting for Telegram (oldest first). |
 | `POST /automation/recordings/:id/claim` | key | Lock a recording (`processing`); returns `driveFileId`, a short-lived academy `accessToken`, and `targets[]` = one `{sessionId, chat, caption}` per group channel (joint lectures have several). No channel → `no_channel` (422). |
@@ -110,7 +110,9 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 | `POST /joint-lectures/:id/cancel` | ID token | Cancel before it starts; restores numbering. |
 
 ### Drive layout & scope
-`تسجيلات المحاضرات / <courseName> / <batchCode or group name> / محاضرة NN - <trainer name>` and files named `<batchCode> - محاضرة NN[ - جزء N] - YYYY-MM-DD HH.MM.webm` (Cairo time). The scope is `drive.file`: the backend only sees folders/files it created, which is why archiving and moving must be done by the backend, not by n8n or a person's script.
+Meeting recordings (the extension's "تسجيل اجتماع" option) live apart, in `تسجيلات عامة / YYYY-MM /`, and have no group, lecture or Telegram step.
+
+Lectures: `تسجيلات المحاضرات / <courseName> / <batchCode or group name> / محاضرة NN - <trainer name>` and files named `<batchCode> - محاضرة NN[ - جزء N] - YYYY-MM-DD HH.MM.webm` (Cairo time). The scope is `drive.file`: the backend only sees folders/files it created, which is why archiving and moving must be done by the backend, not by n8n or a person's script.
 
 ---
 
@@ -120,7 +122,7 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 |---|---|
 | `recorderTokens/{sha256}` | `uid, email, name, role, createdAt, lastUsedAt, revokedAt, userAgent` |
 | `recorderDriveFolders/{sha256(parentId/name)}` | `parentId, name, folderId, status (creating/ready), lockedAt` — one folder per name even with concurrent uploads; dead folders are recreated. |
-| `lectureRecordings/{id}` | lecture fields (`groupId, groupName, batchCode, courseName, sessionId, sessionNumber, sessionDate, jointLectureId`), trainer, `folderId/Path, fileName, part, mimeType, status (uploading/uploaded), driveFileId, webViewLink, bytes, durationSec, recordedAt, uploadedAt`, `telegramStatus (pending/processing/done/failed/no_channel), telegramAttempts, telegramError, telegramMessageLink, telegramLinks[], jointShortcuts[]`. |
+| `lectureRecordings/{id}` | `kind: "meeting"` for meeting recordings (then only `title`, no lecture fields, no `telegramStatus`); otherwise lecture fields (`groupId, groupName, batchCode, courseName, sessionId, sessionNumber, sessionDate, jointLectureId`), trainer, `folderId/Path, fileName, part, mimeType, status (uploading/uploaded), driveFileId, webViewLink, bytes, durationSec, recordedAt, uploadedAt`, `telegramStatus (pending/processing/done/failed/no_channel), telegramAttempts, telegramError, telegramMessageLink, telegramLinks[], jointShortcuts[]`. |
 | `jointLectures/{id}` | `date, time, title, meetingLink, note, status (scheduled/cancelled), groups[{groupId, sessionId}], groupIds, createdBy*, cancelled*` |
 | `sessions` (existing, client-readable) | New fields: `lectureRecordingParts[]`, `isJoint, jointLectureId, jointGroups[{groupId, groupName, batchCode, sessionId}], jointTime`. `lectureRecordingUrl` is written by the backend. |
 | `groups` (existing) | Read: `courseName, batchCode, telegramRecordsLink, archived, totalSessions, feedbackSessions`. |
@@ -182,7 +184,7 @@ Python 3.12, Telethon (user account → 2 GB file limit), aiohttp, ffmpeg.
 
 | What | How |
 |---|---|
-| Functions | `cd functions && npm test` (15 tests) then `firebase deploy --only functions:recorder,functions:syncJointLecture --project sg-tms-v2` |
+| Functions | `cd functions && npm test` (16 tests) then `firebase deploy --only functions:recorder,functions:syncJointLecture --project sg-tms-v2` |
 | Website | `VITE_GOOGLE_CLIENT_ID=… VITE_GOOGLE_PICKER_API_KEY=… npx vite build --outDir <dir>` then upload every file to `public_html` with the Hostinger file API: `hosting_files_generate-upload-url` → for each file `POST {url}/{path}?override=true` (`Upload-Length`) then `PATCH` the bytes (`Tus-Resumable: 1.0.0`, headers `X-Auth`, `X-Auth-Rest`). Upload `assets/` first and `index.html` last. GitHub Actions (`.github/workflows/deploy.yml`) does the same on push to `main`, but the account's Actions minutes ran out. |
 | Extension | §3 |
 | telegram-uploader | §9 |
