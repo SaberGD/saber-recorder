@@ -2,7 +2,7 @@
 
 Saber Recorder إضافة لكروم بتسجّل المحاضرة الأونلاين وتحفظها على جهازك وترفعها على Drive الأكاديمية، وبعدها التسجيل بيوصل لقناة تليجرام الجروب ولينكه بيتحط في المحاضرة على السيستم لوحده.
 
-**التحميل:** [Saber-Recorder.zip](https://training.sabergroupacademy.com/downloads/Saber-Recorder.zip) (آخر نسخة: 1.3.8)
+**التحميل:** [Saber-Recorder.zip](https://training.sabergroupacademy.com/downloads/Saber-Recorder.zip) (آخر نسخة: 1.3.9)
 `https://training.sabergroupacademy.com/downloads/Saber-Recorder.zip`
 
 ## بتعمل إيه

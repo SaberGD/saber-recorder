@@ -54,7 +54,7 @@ A trainer records an online lecture with the **Saber Recorder** Chrome extension
 
 ## 3. Chrome extension (`SaberGD/saber-recorder`)
 
-MV3, Chrome 116+. Current version **1.3.8** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings, MP4 recording).
+MV3, Chrome 116+. Current version **1.3.9** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings, MP4 recording).
 
 | File | Role |
 |---|---|
@@ -71,7 +71,7 @@ MV3, Chrome 116+. Current version **1.3.8** (Saber Group redesign by the academy
 | `lib/recordings.js` | Recording state in `chrome.storage`. |
 | `theme.js` | Light/dark theme and A−/A+ UI size, saved per device in `localStorage`. |
 
-**Format:** MP4 (H.264 + AAC, `video/mp4;codecs=avc1.640028,mp4a.40.2`, MediaRecorder timeslice 2 s, `videoKeyFrameIntervalDuration: 2000` so seeking works; without it Chrome puts minutes between keyframes in screen recordings). Current Chrome writes fragmented MP4 progressively, so a closed tab or crash keeps what was recorded (a truncated fMP4 still plays). Browsers without MP4 recording fall back to WebM (VP9 + Opus); `lib/webm-duration.js` only applies to that fallback. The VPS copies H.264 video as-is when building the Telegram MP4 (re-encodes only other codecs or > 1080p).
+**Format:** MP4 (H.264 + AAC, `video/mp4;codecs=avc1.640028,mp4a.40.2`, MediaRecorder timeslice 2 s, `videoKeyFrameIntervalDuration: 2000` so seeking works; without it Chrome puts minutes between keyframes in screen recordings). Current Chrome writes fragmented MP4 progressively, so a closed tab or crash keeps what was recorded (a truncated fMP4 still plays). Before the first MP4 recording on a Chrome version, a 3.5 s probe checks that MP4 data arrives while recording (fragments are cut at each keyframe); if not, that browser records WebM. The result is cached per Chrome version in `chrome.storage.local.mp4Check`. Browsers without MP4 recording also fall back to WebM (VP9 + Opus); `lib/webm-duration.js` only applies to that fallback. The VPS copies H.264 video as-is when building the Telegram MP4 (re-encodes only other codecs or > 1080p).
 
 **Packaging:** `bash scripts/package.sh` → `dist/Saber-Recorder-<version>.zip`. Bump `version` in `manifest.json` and the `v1.x.x` label in `popup.html`. Keep `extension/meet-recorder/` in the system repo identical (it has no `scripts/`, `docs/`).
 

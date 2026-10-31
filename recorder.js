@@ -298,7 +298,11 @@ async function startRecorder() {
   if (session.videoTrack) tracks.push(session.videoTrack);
   if (session.audio) tracks.push(session.audio.dest.stream.getAudioTracks()[0]);
   const stream = new MediaStream(tracks);
-  const mimeType = pickMimeType(Boolean(session.videoTrack), Boolean(session.audio));
+  let mimeType = pickMimeType(Boolean(session.videoTrack), Boolean(session.audio));
+  // MP4 بيتسجّل بس لو المتصفح بيكتبه أول بأول. غير كده (كروم قديم) WebM علشان مفيش حاجة تضيع لو الجهاز فصل
+  if (/mp4/.test(mimeType) && !(await writesProgressively(stream, mimeType))) {
+    mimeType = pickMimeType(Boolean(session.videoTrack), Boolean(session.audio), { webmOnly: true });
+  }
   const ext = extensionFor(mimeType);
 
   session.recorder = new MediaRecorder(stream, {
@@ -958,14 +962,39 @@ function levelPercent(analyser) {
 
 // MP4 (H.264 + AAC) بيشتغل على أي جهاز ومشغّل. كروم الجديد بيكتب MP4 أول بأول (fragmented MP4) زي WebM،
 // فلو الجهاز فصل اللي اتسجّل مش بيضيع. المتصفح اللي مبيدعمش MP4 بيرجع لـ WebM (VP9).
-function pickMimeType(hasVideo, hasAudio) {
+function pickMimeType(hasVideo, hasAudio, { webmOnly = false } = {}) {
   const mp4 = hasVideo
     ? ['avc1.640028', 'avc1'].flatMap((v) => (hasAudio ? ['mp4a.40.2', 'opus'].map((a) => `video/mp4;codecs=${v},${a}`) : [`video/mp4;codecs=${v}`]))
     : ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4;codecs=opus'];
   const webm = hasVideo
     ? ['vp9', 'vp8'].map((v) => `video/webm;codecs=${hasAudio ? `${v},opus` : v}`)
     : ['audio/webm;codecs=opus'];
-  return [...mp4, ...webm].find((t) => MediaRecorder.isTypeSupported(t)) || (hasVideo ? 'video/webm' : 'audio/webm');
+  return [...(webmOnly ? [] : mp4), ...webm].find((t) => MediaRecorder.isTypeSupported(t)) || (hasVideo ? 'video/webm' : 'audio/webm');
+}
+
+// تجربة 3.5 ثانية قبل التسجيل: لو المتصفح طلّع بيانات MP4 وهو لسه بيسجّل يبقى بيكتبه أول بأول
+// (MP4 بيطلع حتة عند كل keyframe، يعني كل ثانيتين).
+// النتيجة بتتحفظ لكل نسخة كروم، فالتجربة بتحصل مرة واحدة بس.
+async function writesProgressively(stream, mimeType) {
+  const key = `progressive:${mimeType}:${navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0] || ''}`;
+  const { mp4Check = {} } = await chrome.storage.local.get('mp4Check');
+  if (key in mp4Check) return mp4Check[key];
+
+  let ok = false;
+  try {
+    const probe = new MediaRecorder(stream, { mimeType, videoKeyFrameIntervalDuration: 2000 });
+    let chunks = 0;
+    probe.ondataavailable = (e) => { if (e.data.size && probe.state === 'recording') chunks += 1; };
+    probe.start(300);
+    await new Promise((r) => setTimeout(r, 3500));
+    ok = chunks >= 2;
+    probe.ondataavailable = null;
+    if (probe.state !== 'inactive') probe.stop();
+  } catch {
+    ok = false;
+  }
+  await chrome.storage.local.set({ mp4Check: { ...mp4Check, [key]: ok } });
+  return ok;
 }
 
 function extensionFor(mimeType) {
