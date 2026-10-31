@@ -305,6 +305,9 @@ async function startRecorder() {
     mimeType,
     videoBitsPerSecond: quality.videoBitsPerSecond,
     audioBitsPerSecond: quality.audioBitsPerSecond,
+    // من غيرها كروم بيحط keyframe كل كام دقيقة في تسجيل الشاشة، فالتقديم في الفيديو بيعلّق.
+    // keyframe كل ثانيتين = التقديم بيستجيب على طول (المتصفح القديم بيتجاهلها)
+    videoKeyFrameIntervalDuration: 2000,
   });
 
   const now = new Date();
