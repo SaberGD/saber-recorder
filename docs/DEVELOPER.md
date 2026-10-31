@@ -102,6 +102,7 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 | `POST /uploads` | srec | Create/find folders (lock in `recorderDriveFolders`), number the part, open a Drive resumable session. Returns `{recordingId, uploadUrl, folderPath, fileName, part}`. The extension uploads bytes straight to `uploadUrl`. With `{kind:"meeting", title}` (no group/lecture) the file goes to `تسجيلات عامة / YYYY-MM / <title> - <trainer> - <date time>` and is never queued for Telegram. |
 | `POST /uploads/:id/complete` | srec | Verify the file is in the recording's folder; if the trainer changed the lecture, move + rename; set `status: uploaded`, `telegramStatus: pending`. For a joint lecture, create Drive shortcuts in the other groups' lecture folders. |
 | `GET /automation/pending` | key | Recordings waiting for Telegram (oldest first). Meetings and anything without `groupId`/`sessionId` are never listed, and `claim` refuses them (`telegramStatus: skipped`). |
+| `POST /automation/recordings/release` | key | Called by telegram-uploader on startup: every recording left in `processing` (the previous instance stopped mid-upload) goes back to `pending` at once. A claim older than 3 h is also listed by `/pending` again. |
 | `POST /automation/recordings/:id/claim` | key | Lock a recording (`processing`); returns `driveFileId`, a short-lived academy `accessToken`, and `targets[]` = one `{sessionId, chat, caption}` per group channel (joint lectures have several). No channel → `no_channel` (422). |
 | `POST /automation/recordings/:id/result` | key | `{ok:true, links:[{sessionId, messageLink}]}` (or legacy `messageLink`) → `telegramStatus: done`, writes `lectureRecordingUrl` (part 1, or if empty) and `lectureRecordingParts[]` on each session. `{ok:false, error}` → retry, `failed` after 3 attempts. |
 | `POST /automation/archive-groups[?dryRun=1][&months=6]` | key | Move Drive folders of finished groups to `<course>/Archive` (see §7). |
@@ -168,7 +169,8 @@ Manual test of the uploader: `POST http://telegram-uploader:8080/process?wait=1`
 Python 3.12, Telethon (user account → 2 GB file limit), aiohttp, ffmpeg.
 
 - **Loop per recording**: claim → download from Drive with the token from claim → `ffmpeg` to H.264/AAC MP4 with `+faststart` (H.264 ≤ 1080p with keyframes ≤ 5 s apart is copied as-is; anything else is re-encoded with 3 threads and a forced keyframe every 2 s, so Telegram seeking works) → thumbnail → upload to the first target channel → re-send the same media to the other targets (joint lectures) → report links. Work files in `/data/work/<id>` are deleted after each recording. FloodWait stops the batch until the next run. `BATCH_LIMIT` (default 5) per run.
-- **HTTP**: `/process`, `/status`, `/health` on port 8080, opened before connecting to Telegram.
+- **HTTP**: `/process`, `/status` (includes `current`: recording id, step `downloading/converting/uploading/sharing`, percent), `/health` on port 8080, opened before connecting to Telegram.
+- **Limits**: one recording may take at most `JOB_TIMEOUT_MIN` (150) minutes, and a Telegram upload with no progress for `UPLOAD_STALL_MIN` (10) minutes is cancelled; both report a failure, so the recording is retried on the next run (up to 3 attempts). On startup the service calls `/automation/recordings/release`.
 - **Config (env)**: `RECORDER_API`, `DRIVE_API`, `AUTOMATION_KEY`, `DATA_DIR` (always `/data` inside the container), `FFMPEG_THREADS`, `BATCH_LIMIT`.
 - **Install / update** (on the VPS, from a checkout of the repo): `bash telegram-uploader/deploy/install.sh` — copies code to `/opt/telegram-uploader`, writes `.env` from `/root/.recorder-automation-key`, builds and starts, waits for `/status`.
 - **Telegram login (once, interactive)**:
@@ -184,7 +186,7 @@ Python 3.12, Telethon (user account → 2 GB file limit), aiohttp, ffmpeg.
 
 | What | How |
 |---|---|
-| Functions | `cd functions && npm test` (16 tests) then `firebase deploy --only functions:recorder,functions:syncJointLecture --project sg-tms-v2` |
+| Functions | `cd functions && npm test` (17 tests) then `firebase deploy --only functions:recorder,functions:syncJointLecture --project sg-tms-v2` |
 | Website | `VITE_GOOGLE_CLIENT_ID=… VITE_GOOGLE_PICKER_API_KEY=… npx vite build --outDir <dir>` then upload every file to `public_html` with the Hostinger file API: `hosting_files_generate-upload-url` → for each file `POST {url}/{path}?override=true` (`Upload-Length`) then `PATCH` the bytes (`Tus-Resumable: 1.0.0`, headers `X-Auth`, `X-Auth-Rest`). Upload `assets/` first and `index.html` last. GitHub Actions (`.github/workflows/deploy.yml`) does the same on push to `main`, but the account's Actions minutes ran out. |
 | Extension | §3 |
 | telegram-uploader | §9 |
