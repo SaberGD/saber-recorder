@@ -299,7 +299,7 @@ async function startRecorder() {
   if (session.audio) tracks.push(session.audio.dest.stream.getAudioTracks()[0]);
   const stream = new MediaStream(tracks);
   const mimeType = pickMimeType(Boolean(session.videoTrack), Boolean(session.audio));
-  const ext = session.videoTrack ? 'webm' : 'weba';
+  const ext = extensionFor(mimeType);
 
   session.recorder = new MediaRecorder(stream, {
     mimeType,
@@ -623,7 +623,8 @@ async function saveLocally() {
     try {
       const file = await session.file.getFile();
       // المدة بتتضاف بس لو التسجيل خلص طبيعي، لأن مدة التسجيل اللي اتقطع مش مضبوطة بالثانية
-      const blob = session.rec.cleanStop ? await withWebmDuration(file, session.rec.durationMs) : file;
+      const isWebm = /webm/.test(session.rec.mimeType || '');
+      const blob = session.rec.cleanStop && isWebm ? await withWebmDuration(file, session.rec.durationMs) : file;
       const url = URL.createObjectURL(blob);
       const downloadId = await downloadWithFallbackName(url);
       session.local.downloadId = downloadId;
@@ -952,13 +953,22 @@ function levelPercent(analyser) {
   return Math.min(100, Math.round(rms * 400));
 }
 
-// WebM لأنه بيتكتب أول بأول (MP4 في كروم مبيطلعش غير لما التسجيل يخلص، فلو الجهاز فصل كله يضيع).
-// VP9 ضغطه أحسن بكتير للشاشة والكلام.
+// MP4 (H.264 + AAC) بيشتغل على أي جهاز ومشغّل. كروم الجديد بيكتب MP4 أول بأول (fragmented MP4) زي WebM،
+// فلو الجهاز فصل اللي اتسجّل مش بيضيع. المتصفح اللي مبيدعمش MP4 بيرجع لـ WebM (VP9).
 function pickMimeType(hasVideo, hasAudio) {
-  const candidates = hasVideo
+  const mp4 = hasVideo
+    ? ['avc1.640028', 'avc1'].flatMap((v) => (hasAudio ? ['mp4a.40.2', 'opus'].map((a) => `video/mp4;codecs=${v},${a}`) : [`video/mp4;codecs=${v}`]))
+    : ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4;codecs=opus'];
+  const webm = hasVideo
     ? ['vp9', 'vp8'].map((v) => `video/webm;codecs=${hasAudio ? `${v},opus` : v}`)
     : ['audio/webm;codecs=opus'];
-  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || (hasVideo ? 'video/webm' : 'audio/webm');
+  return [...mp4, ...webm].find((t) => MediaRecorder.isTypeSupported(t)) || (hasVideo ? 'video/webm' : 'audio/webm');
+}
+
+function extensionFor(mimeType) {
+  if (mimeType.startsWith('video/mp4')) return 'mp4';
+  if (mimeType.startsWith('audio/mp4')) return 'm4a';
+  return mimeType.startsWith('audio/') ? 'weba' : 'webm';
 }
 
 // مدة التسجيل اللي اتقطع مش مضبوطة (بتتحفظ كل كام ثانية بس)، فمش بنعرضها

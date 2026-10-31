@@ -54,7 +54,7 @@ A trainer records an online lecture with the **Saber Recorder** Chrome extension
 
 ## 3. Chrome extension (`SaberGD/saber-recorder`)
 
-MV3, Chrome 116+. Current version **1.3.5** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings).
+MV3, Chrome 116+. Current version **1.3.6** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings, MP4 recording).
 
 | File | Role |
 |---|---|
@@ -71,7 +71,7 @@ MV3, Chrome 116+. Current version **1.3.5** (Saber Group redesign by the academy
 | `lib/recordings.js` | Recording state in `chrome.storage`. |
 | `theme.js` | Light/dark theme and A−/A+ UI size, saved per device in `localStorage`. |
 
-**Format:** WebM (VP9 + Opus, MediaRecorder timeslice 2 s). Chrome only writes MP4 at the end of a recording, so a crash would lose everything; WebM is written progressively. Conversion to MP4 happens later on the VPS.
+**Format:** MP4 (H.264 + AAC, `video/mp4;codecs=avc1.640028,mp4a.40.2`, MediaRecorder timeslice 2 s). Current Chrome writes fragmented MP4 progressively, so a closed tab or crash keeps what was recorded (a truncated fMP4 still plays). Browsers without MP4 recording fall back to WebM (VP9 + Opus); `lib/webm-duration.js` only applies to that fallback. The VPS copies H.264 video as-is when building the Telegram MP4 (re-encodes only other codecs or > 1080p).
 
 **Packaging:** `bash scripts/package.sh` → `dist/Saber-Recorder-<version>.zip`. Bump `version` in `manifest.json` and the `v1.x.x` label in `popup.html`. Keep `extension/meet-recorder/` in the system repo identical (it has no `scripts/`, `docs/`).
 
@@ -112,7 +112,7 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 ### Drive layout & scope
 Meeting recordings (the extension's "تسجيل اجتماع" option) live apart, in `تسجيلات عامة / YYYY-MM /`, and have no group, lecture or Telegram step.
 
-Lectures: `تسجيلات المحاضرات / <courseName> / <batchCode or group name> / محاضرة NN - <trainer name>` and files named `<batchCode> - محاضرة NN[ - جزء N] - YYYY-MM-DD HH.MM.webm` (Cairo time). The scope is `drive.file`: the backend only sees folders/files it created, which is why archiving and moving must be done by the backend, not by n8n or a person's script.
+Lectures: `تسجيلات المحاضرات / <courseName> / <batchCode or group name> / محاضرة NN - <trainer name>` and files named `<batchCode> - محاضرة NN[ - جزء N] - YYYY-MM-DD HH.MM.mp4` (Cairo time). The scope is `drive.file`: the backend only sees folders/files it created, which is why archiving and moving must be done by the backend, not by n8n or a person's script.
 
 ---
 
@@ -167,7 +167,7 @@ Manual test of the uploader: `POST http://telegram-uploader:8080/process?wait=1`
 
 Python 3.12, Telethon (user account → 2 GB file limit), aiohttp, ffmpeg.
 
-- **Loop per recording**: claim → download from Drive with the token from claim → `ffmpeg` to H.264/AAC MP4 with `+faststart` (3 threads) → thumbnail → upload to the first target channel → re-send the same media to the other targets (joint lectures) → report links. Work files in `/data/work/<id>` are deleted after each recording. FloodWait stops the batch until the next run. `BATCH_LIMIT` (default 5) per run.
+- **Loop per recording**: claim → download from Drive with the token from claim → `ffmpeg` to H.264/AAC MP4 with `+faststart` (H.264 ≤ 1080p is copied as-is; other codecs re-encoded with 3 threads) → thumbnail → upload to the first target channel → re-send the same media to the other targets (joint lectures) → report links. Work files in `/data/work/<id>` are deleted after each recording. FloodWait stops the batch until the next run. `BATCH_LIMIT` (default 5) per run.
 - **HTTP**: `/process`, `/status`, `/health` on port 8080, opened before connecting to Telegram.
 - **Config (env)**: `RECORDER_API`, `DRIVE_API`, `AUTOMATION_KEY`, `DATA_DIR` (always `/data` inside the container), `FFMPEG_THREADS`, `BATCH_LIMIT`.
 - **Install / update** (on the VPS, from a checkout of the repo): `bash telegram-uploader/deploy/install.sh` — copies code to `/opt/telegram-uploader`, writes `.env` from `/root/.recorder-automation-key`, builds and starts, waits for `/status`.
