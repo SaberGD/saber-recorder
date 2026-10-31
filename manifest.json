@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Saber Group Recorder",
   "short_name": "Saber Recorder",
-  "version": "1.3.7",
+  "version": "1.3.8",
   "description": "تسجيل المحاضرات أونلاين (الشاشة وصوت الجهاز والمايك) مع حفظ على الجهاز ورفع تلقائي على Drive الأكاديمية في فولدر المحاضرة.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt7pyzxg4AVNYz+XOL1r+auFachiAFxLuWaZoQnK2QF2GTdwcIvDUBw2B2SxE+h07MMPeV8UwSdObtfhzpTMgGCJlXHdIlFivdCpkEYU17r/QwygggNIYpd+Z+j1StaQLPfQm/jL01ipLv07jbd8bTI2QGr6Bfp65DEwvcoaetzK2oxIX9OSAGml0fKBi4viOh4Vi8dSG6634cYmodfyS6nVi2nSSnxvz/F8x7Aqb5uq6bXhTLGu9CLtpa18LA+EYmxe70EhcBDlLEdi+F3Br21xa2v2GgO52jEHPAnu4FZAoXU1B2meHeWW+4DT4H+BVZjmCNLRmrC8gsFxnsYh/UQIDAQAB",
   "minimum_chrome_version": "116",

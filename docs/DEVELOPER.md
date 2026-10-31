@@ -54,7 +54,7 @@ A trainer records an online lecture with the **Saber Recorder** Chrome extension
 
 ## 3. Chrome extension (`SaberGD/saber-recorder`)
 
-MV3, Chrome 116+. Current version **1.3.7** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings, MP4 recording).
+MV3, Chrome 116+. Current version **1.3.8** (Saber Group redesign by the academy, joint lecture label, fixed popup size, A−/A+ UI size, meeting recordings, MP4 recording).
 
 | File | Role |
 |---|---|
@@ -98,10 +98,10 @@ Base URL: `https://us-central1-sg-tms-v2.cloudfunctions.net/recorder`
 | `GET /me`, `POST /unlink` | srec | Who am I / revoke. |
 | `GET /groups` | srec | Active groups, the trainer's first. |
 | `GET /groups/:id/sessions` | srec | Lectures of a group, with `myParts` and `jointGroups` count. |
-| `GET /detect?meet=` | srec | Guess the lecture from the Meet link (or today's schedule). `confident` when there is one match today, or all of today's matches are copies of the same joint lecture. |
+| `GET /detect?meet=` | srec | Picks a lecture **only** when the open Meet link is the stored link of a lecture dated today (one match, or all copies of one joint lecture). Otherwise `{match:null, reason: no_meet / no_lecture_today / ambiguous}` and the trainer chooses; there is no guess from the schedule. The extension also preselects only a confident `meet` match. |
 | `POST /uploads` | srec | Create/find folders (lock in `recorderDriveFolders`), number the part, open a Drive resumable session. Returns `{recordingId, uploadUrl, folderPath, fileName, part}`. The extension uploads bytes straight to `uploadUrl`. With `{kind:"meeting", title}` (no group/lecture) the file goes to `تسجيلات عامة / YYYY-MM / <title> - <trainer> - <date time>` and is never queued for Telegram. |
 | `POST /uploads/:id/complete` | srec | Verify the file is in the recording's folder; if the trainer changed the lecture, move + rename; set `status: uploaded`, `telegramStatus: pending`. For a joint lecture, create Drive shortcuts in the other groups' lecture folders. |
-| `GET /automation/pending` | key | Recordings waiting for Telegram (oldest first). |
+| `GET /automation/pending` | key | Recordings waiting for Telegram (oldest first). Meetings and anything without `groupId`/`sessionId` are never listed, and `claim` refuses them (`telegramStatus: skipped`). |
 | `POST /automation/recordings/:id/claim` | key | Lock a recording (`processing`); returns `driveFileId`, a short-lived academy `accessToken`, and `targets[]` = one `{sessionId, chat, caption}` per group channel (joint lectures have several). No channel → `no_channel` (422). |
 | `POST /automation/recordings/:id/result` | key | `{ok:true, links:[{sessionId, messageLink}]}` (or legacy `messageLink`) → `telegramStatus: done`, writes `lectureRecordingUrl` (part 1, or if empty) and `lectureRecordingParts[]` on each session. `{ok:false, error}` → retry, `failed` after 3 attempts. |
 | `POST /automation/archive-groups[?dryRun=1][&months=6]` | key | Move Drive folders of finished groups to `<course>/Archive` (see §7). |

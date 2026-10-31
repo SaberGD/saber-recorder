@@ -752,7 +752,7 @@ function renderSave() {
       retrying: `⚠ ${up.error} — هيحاول تاني لوحده`,
       'needs-auth': `⚠ ${up.error}`,
       failed: `✗ ${up.error}`,
-      done: rec.drive?.completed ? `✓ اترفع في: ${rec.drive.folderPath || up.folderPath}` : '✓ اترفع، مستني تأكيد المحاضرة',
+      done: rec.drive?.completed ? `✓ اترفع في: ${rec.drive.folderPath || up.folderPath}` : rec.kind === 'meeting' ? '✓ اترفع، بيتأكد من الملف...' : '✓ اترفع، مستني تأكيد المحاضرة',
     };
     parts.push(`<div class="row"><span class="source-icon">${ICONS.drive}</span><div class="grow">
         <div class="row" style="margin:0"><span class="bold grow">Drive الأكاديمية</span><span class="muted ltr">${formatBytes(up.uploaded)} / ${formatBytes(total)}</span></div>
